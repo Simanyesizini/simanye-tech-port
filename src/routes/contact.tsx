@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
 import { Mail, Phone, Linkedin, Download, Send, CheckCircle2 } from "lucide-react";
 import { z } from "zod";
+import { getSignedAssetUrl } from "@/lib/site-assets";
+
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -23,6 +25,11 @@ const schema = z.object({
 function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [cvUrl, setCvUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSignedAssetUrl("cv", "cv").then(setCvUrl);
+  }, []);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -59,11 +66,13 @@ function ContactPage() {
             <p className="mt-1 text-sm text-muted-foreground">Download a full PDF copy of my CV.</p>
           </div>
           <a
-            href="/Simanye_Tevin_Sizini_CV.pdf"
-            download
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            href={cvUrl ?? "#"}
+            target={cvUrl ? "_blank" : undefined}
+            rel="noreferrer"
+            aria-disabled={!cvUrl}
+            className={`inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 ${!cvUrl ? "pointer-events-none opacity-50" : ""}`}
           >
-            <Download className="h-4 w-4" /> Download CV
+            <Download className="h-4 w-4" /> {cvUrl ? "Download CV" : "CV unavailable"}
           </a>
         </div>
 

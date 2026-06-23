@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { ArrowRight, Mail, Download, Headphones, Network, Wrench, Users } from "lucide-react";
-import profileImg from "@/assets/profile.jpg";
+import fallbackProfileImg from "@/assets/profile.jpg";
 import { SiteLayout, Container } from "@/components/SiteLayout";
+import { getSignedAssetUrl } from "@/lib/site-assets";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -14,6 +16,20 @@ export const Route = createFileRoute("/")({
 });
 
 function Home() {
+  const [profileSrc, setProfileSrc] = useState<string>(fallbackProfileImg);
+  const [cvUrl, setCvUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const [p, c] = await Promise.all([
+        getSignedAssetUrl("profile_image", "profile-images"),
+        getSignedAssetUrl("cv", "cv"),
+      ]);
+      if (p) setProfileSrc(p);
+      setCvUrl(c);
+    })();
+  }, []);
+
   return (
     <SiteLayout>
       <section className="border-b border-border">
@@ -42,7 +58,7 @@ function Home() {
               <Link to="/contact" className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted">
                 <Mail className="h-4 w-4" /> Contact Me
               </Link>
-              <a href="/Simanye_Tevin_Sizini_CV.pdf" download className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted">
+              <a href={cvUrl ?? "#"} target={cvUrl ? "_blank" : undefined} rel="noreferrer" aria-disabled={!cvUrl} className={`inline-flex items-center gap-2 rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted ${!cvUrl ? "pointer-events-none opacity-50" : ""}`}>
                 <Download className="h-4 w-4" /> Download CV
               </a>
             </div>
@@ -50,7 +66,7 @@ function Home() {
           <div className="relative mx-auto w-full max-w-sm">
             <div className="absolute -inset-4 rounded-2xl bg-accent/60 blur-2xl" aria-hidden />
             <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              <img src={profileImg} alt="Portrait of Simanye Tevin Sizini" className="aspect-[4/5] w-full object-cover" />
+              <img src={profileSrc} alt="Portrait of Simanye Tevin Sizini" className="aspect-[4/5] w-full object-cover" />
             </div>
           </div>
         </div>
