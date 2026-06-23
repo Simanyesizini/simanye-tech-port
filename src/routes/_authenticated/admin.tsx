@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText, ImageIcon, LogOut, Trash2, Upload } from "lucide-react";
+import { FileText, ImageIcon, LogOut, Trash2, Upload, UserCircle, FileDown } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
-  head: () => ({ meta: [{ title: "Admin — Manage Certificates" }] }),
+  head: () => ({ meta: [{ title: "Admin — Manage Portfolio" }] }),
   component: AdminPage,
 });
 
@@ -26,12 +26,23 @@ type Certificate = {
   created_at: string;
 };
 
-const ACCEPTED = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
+type SiteAsset = {
+  key: string;
+  file_path: string;
+  file_url: string;
+  file_type: string;
+  updated_at: string;
+};
+
+const CERT_ACCEPTED = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
+const PROFILE_ACCEPTED = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
 
 function AdminPage() {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [certs, setCerts] = useState<Certificate[]>([]);
+
+  // Certificate form state
   const [title, setTitle] = useState("");
   const [institution, setInstitution] = useState("");
   const [dateIssued, setDateIssued] = useState("");
@@ -41,6 +52,21 @@ function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Site assets
+  const [profileAsset, setProfileAsset] = useState<SiteAsset | null>(null);
+  const [profileSignedUrl, setProfileSignedUrl] = useState<string | null>(null);
+  const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [profilePreview, setProfilePreview] = useState<string | null>(null);
+  const [profileUploading, setProfileUploading] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<string | null>(null);
+  const [profileErr, setProfileErr] = useState<string | null>(null);
+
+  const [cvAsset, setCvAsset] = useState<SiteAsset | null>(null);
+  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [cvUploading, setCvUploading] = useState(false);
+  const [cvMsg, setCvMsg] = useState<string | null>(null);
+  const [cvErr, setCvErr] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -53,6 +79,7 @@ function AdminPage() {
       setIsAdmin(Boolean(data));
     })();
     refresh();
+    refreshAssets();
   }, []);
 
   useEffect(() => {
@@ -62,6 +89,13 @@ function AdminPage() {
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  useEffect(() => {
+    if (!profileFile) { setProfilePreview(null); return; }
+    const url = URL.createObjectURL(profileFile);
+    setProfilePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [profileFile]);
+
   async function refresh() {
     const { data } = await supabase
       .from("certificates")
@@ -70,20 +104,30 @@ function AdminPage() {
     setCerts((data as Certificate[]) ?? []);
   }
 
+  async function refreshAssets() {
+    const { data } = await supabase.from("site_assets").select("*");
+    const list = (data as SiteAsset[]) ?? [];
+    const p = list.find((a) => a.key === "profile_image") ?? null;
+    const c = list.find((a) => a.key === "cv") ?? null;
+    setProfileAsset(p);
+    setCvAsset(c);
+    if (p) {
+      const { data: signed } = await supabase.storage.from("profile-images").createSignedUrl(p.file_path, 3600);
+      setProfileSignedUrl(signed?.signedUrl ?? null);
+    } else {
+      setProfileSignedUrl(null);
+    }
+  }
+
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     setError(null);
     const f = e.target.files?.[0] ?? null;
-    if (f && !ACCEPTED.includes(f.type)) {
+    if (f && !CERT_ACCEPTED.includes(f.type)) {
       setError("Only PDF, JPG, or PNG files are accepted.");
-      setFile(null);
-      e.target.value = "";
-      return;
+      setFile(null); e.target.value = ""; return;
     }
     if (f && f.size > 10 * 1024 * 1024) {
-      setError("File must be under 10MB.");
-      setFile(null);
-      e.target.value = "";
-      return;
+      setError("File must be under 10MB."); setFile(null); e.target.value = ""; return;
     }
     setFile(f);
   }
@@ -128,6 +172,96 @@ function AdminPage() {
     await refresh();
   }
 
+  function onProfileFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setProfileErr(null);
+    const f = e.target.files?.[0] ?? null;
+    if (f && !PROFILE_ACCEPTED.includes(f.type)) {
+      setProfileErr("Only JPG, PNG, or WEBP images are accepted.");
+      setProfileFile(null); e.target.value = ""; return;
+    }
+    if (f && f.size > 5 * 1024 * 1024) {
+      setProfileErr("Image must be under 5MB."); setProfileFile(null); e.target.value = ""; return;
+    }
+    setProfileFile(f);
+  }
+
+  async function handleProfileUpload(e: React.FormEvent) {
+    e.preventDefault();
+    setProfileErr(null); setProfileMsg(null);
+    if (!profileFile) { setProfileErr("Please choose an image."); return; }
+    setProfileUploading(true);
+    try {
+      if (profileAsset) {
+        await supabase.storage.from("profile-images").remove([profileAsset.file_path]);
+      }
+      const ext = profileFile.name.split(".").pop() || "jpg";
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("profile-images")
+        .upload(path, profileFile, { contentType: profileFile.type, upsert: false });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("profile-images").getPublicUrl(path);
+      const { error: insErr } = await supabase.from("site_assets").upsert({
+        key: "profile_image",
+        file_path: path,
+        file_url: urlData.publicUrl,
+        file_type: profileFile.type,
+      });
+      if (insErr) throw insErr;
+      setProfileMsg("Profile image updated.");
+      setProfileFile(null);
+      await refreshAssets();
+    } catch (err) {
+      setProfileErr(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setProfileUploading(false);
+    }
+  }
+
+  function onCvFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setCvErr(null);
+    const f = e.target.files?.[0] ?? null;
+    if (f && f.type !== "application/pdf") {
+      setCvErr("CV must be a PDF file."); setCvFile(null); e.target.value = ""; return;
+    }
+    if (f && f.size > 10 * 1024 * 1024) {
+      setCvErr("File must be under 10MB."); setCvFile(null); e.target.value = ""; return;
+    }
+    setCvFile(f);
+  }
+
+  async function handleCvUpload(e: React.FormEvent) {
+    e.preventDefault();
+    setCvErr(null); setCvMsg(null);
+    if (!cvFile) { setCvErr("Please choose a PDF."); return; }
+    setCvUploading(true);
+    try {
+      if (cvAsset) {
+        await supabase.storage.from("cv").remove([cvAsset.file_path]);
+      }
+      const path = `Simanye_Tevin_Sizini_CV-${Date.now()}.pdf`;
+      const { error: upErr } = await supabase.storage
+        .from("cv")
+        .upload(path, cvFile, { contentType: "application/pdf", upsert: false });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from("cv").getPublicUrl(path);
+      const { error: insErr } = await supabase.from("site_assets").upsert({
+        key: "cv",
+        file_path: path,
+        file_url: urlData.publicUrl,
+        file_type: "application/pdf",
+      });
+      if (insErr) throw insErr;
+      setCvMsg("CV updated.");
+      setCvFile(null);
+      await refreshAssets();
+    } catch (err) {
+      setCvErr(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setCvUploading(false);
+    }
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     navigate({ to: "/" });
@@ -155,8 +289,8 @@ function AdminPage() {
     <SiteLayout>
       <PageHeader
         eyebrow="Admin"
-        title="Manage Certificates"
-        description="Upload, preview, and remove certificates that appear on the public Certifications page."
+        title="Manage Portfolio"
+        description="Upload your profile photo, CV, and certificates. Changes appear instantly on the public site."
       />
       <Container>
         <div className="mb-6 flex justify-end">
@@ -165,6 +299,63 @@ function AdminPage() {
           </Button>
         </div>
 
+        {/* Profile + CV row */}
+        <div className="mb-10 grid gap-6 lg:grid-cols-2">
+          <form onSubmit={handleProfileUpload} className="space-y-4 rounded-xl border border-border bg-card p-6">
+            <div className="flex items-center gap-2">
+              <UserCircle className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Profile picture</h2>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="h-20 w-20 overflow-hidden rounded-full border border-border bg-surface">
+                {profilePreview ? (
+                  <img src={profilePreview} alt="New preview" className="h-full w-full object-cover" />
+                ) : profileSignedUrl ? (
+                  <img src={profileSignedUrl} alt="Current profile" className="h-full w-full object-cover" />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-muted-foreground">ST</div>
+                )}
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="profile-file">Upload new image (JPG, PNG, WEBP · max 5MB)</Label>
+                <Input id="profile-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={onProfileFileChange} className="mt-1.5" />
+              </div>
+            </div>
+            {profileErr && <p className="text-sm text-destructive">{profileErr}</p>}
+            {profileMsg && <p className="text-sm text-primary">{profileMsg}</p>}
+            <Button type="submit" disabled={profileUploading} className="w-full">
+              <Upload className="h-4 w-4" /> {profileUploading ? "Uploading…" : "Save profile image"}
+            </Button>
+          </form>
+
+          <form onSubmit={handleCvUpload} className="space-y-4 rounded-xl border border-border bg-card p-6">
+            <div className="flex items-center gap-2">
+              <FileDown className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Curriculum Vitae</h2>
+            </div>
+            <div className="rounded-md border border-border bg-surface p-3 text-sm">
+              {cvAsset ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate text-muted-foreground">Current: {cvAsset.file_path}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(cvAsset.updated_at).toLocaleDateString()}</span>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">No CV uploaded yet.</span>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="cv-file">Upload new CV (PDF · max 10MB)</Label>
+              <Input id="cv-file" type="file" accept="application/pdf" onChange={onCvFileChange} className="mt-1.5" />
+            </div>
+            {cvErr && <p className="text-sm text-destructive">{cvErr}</p>}
+            {cvMsg && <p className="text-sm text-primary">{cvMsg}</p>}
+            <Button type="submit" disabled={cvUploading} className="w-full">
+              <Upload className="h-4 w-4" /> {cvUploading ? "Uploading…" : "Save CV"}
+            </Button>
+          </form>
+        </div>
+
+        {/* Certificates */}
         <div className="grid gap-8 lg:grid-cols-2">
           <form onSubmit={handleUpload} className="space-y-4 rounded-xl border border-border bg-card p-6">
             <h2 className="text-lg font-semibold">Upload new certificate</h2>
