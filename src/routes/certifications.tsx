@@ -248,17 +248,9 @@ function CertificationsPage() {
                       <span>{new Date(cert.date_issued).toLocaleDateString(undefined, { year: "numeric" })}</span>
                       <span className="rounded-full bg-accent/30 px-2 py-1">{cert.file_type === "application/pdf" ? "PDF" : "Image"}</span>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <Button type="button" size="sm" onClick={() => { setViewing(cert); setIsOpen(true); }}>
-                        View Certificate
-                      </Button>
-                      <Button asChild size="sm" variant="outline">
-                        <a href={cert.file_url} target="_blank" rel="noreferrer" download>
-                          <Download className="h-3.5 w-3.5" />
-                          Download
-                        </a>
-                      </Button>
-                    </div>
+                    <Button type="button" size="sm" className="w-full" onClick={() => { setViewing(cert); setIsOpen(true); }}>
+                      View Certificate
+                    </Button>
                   </div>
                 </article>
               ))}
@@ -308,9 +300,17 @@ function CertificationsPage() {
                 <div className="text-sm text-muted-foreground">Full-screen support available via browser controls.</div>
                 <div className="flex gap-2">
                   {signedUrl && (
-                    <Button asChild size="sm" variant="outline">
-                      <a href={signedUrl} target="_blank" rel="noreferrer">Open in new tab</a>
-                    </Button>
+                    <>
+                      <Button asChild size=\"sm\" variant=\"outline\">
+                        <a href={signedUrl} target=\"_blank\" rel=\"noreferrer\" download>
+                          <Download className=\"h-3.5 w-3.5\" />
+                          Download
+                        </a>
+                      </Button>
+                      <Button asChild size=\"sm\" variant=\"outline\">
+                        <a href={signedUrl} target=\"_blank\" rel=\"noreferrer\">Open in new tab</a>
+                      </Button>
+                    </>
                   )}
                   <DialogClose asChild>
                     <Button size="sm">Close</Button>
