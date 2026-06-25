@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText, ImageIcon, LogOut, Trash2, Upload, UserCircle, FileDown } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileText, ImageIcon, LogOut, Trash2, Upload, UserCircle, FileDown, Plus, Edit2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -34,26 +35,160 @@ type SiteAsset = {
   updated_at: string;
 };
 
+type HomeContent = {
+  id: string;
+  name: string;
+  title: string;
+  tagline: string;
+  summary: string;
+};
+
+type AboutContent = {
+  id: string;
+  personal_background: string;
+  professional_background: string;
+  vision: string;
+  mission: string;
+  career_goals: string;
+  interests: string;
+};
+
+type Education = {
+  id: string;
+  institution: string;
+  field_of_study: string;
+  degree: string;
+  start_date: string | null;
+  end_date: string | null;
+  description: string | null;
+  display_order: number;
+};
+
+type Experience = {
+  id: string;
+  title: string;
+  company: string;
+  start_date: string;
+  end_date: string | null;
+  description: string;
+  display_order: number;
+};
+
+type Project = {
+  id: string;
+  title: string;
+  description: string;
+  technologies: string | null;
+  link: string | null;
+  image_path: string | null;
+  image_url: string | null;
+  display_order: number;
+};
+
+type ContactInfo = {
+  id: string;
+  email: string;
+  phone: string | null;
+  linkedin: string | null;
+  github: string | null;
+};
+
+type FooterContent = {
+  id: string;
+  copyright_text: string;
+};
+
 const CERT_ACCEPTED = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
 const PROFILE_ACCEPTED = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
+const PROJECT_IMAGE_ACCEPTED = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
 
 function AdminPage() {
   const navigate = useNavigate();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [activeTab, setActiveTab] = useState("files");
+
+  // Home Content
+  const [homeContent, setHomeContent] = useState<HomeContent | null>(null);
+  const [homeName, setHomeName] = useState("");
+  const [homeTitle, setHomeTitle] = useState("");
+  const [homeTagline, setHomeTagline] = useState("");
+  const [homeSummary, setHomeSummary] = useState("");
+  const [homeLoading, setHomeLoading] = useState(false);
+  const [homeMsg, setHomeMsg] = useState<string | null>(null);
+
+  // About Content
+  const [aboutContent, setAboutContent] = useState<AboutContent | null>(null);
+  const [aboutPersonal, setAboutPersonal] = useState("");
+  const [aboutProfessional, setAboutProfessional] = useState("");
+  const [aboutVision, setAboutVision] = useState("");
+  const [aboutMission, setAboutMission] = useState("");
+  const [aboutGoals, setAboutGoals] = useState("");
+  const [aboutInterests, setAboutInterests] = useState("");
+  const [aboutLoading, setAboutLoading] = useState(false);
+  const [aboutMsg, setAboutMsg] = useState<string | null>(null);
+
+  // Education
+  const [education, setEducation] = useState<Education[]>([]);
+  const [editingEduId, setEditingEduId] = useState<string | null>(null);
+  const [eduInstitution, setEduInstitution] = useState("");
+  const [eduField, setEduField] = useState("");
+  const [eduDegree, setEduDegree] = useState("");
+  const [eduStart, setEduStart] = useState("");
+  const [eduEnd, setEduEnd] = useState("");
+  const [eduDesc, setEduDesc] = useState("");
+  const [eduLoading, setEduLoading] = useState(false);
+  const [eduMsg, setEduMsg] = useState<string | null>(null);
+
+  // Experience
+  const [experience, setExperience] = useState<Experience[]>([]);
+  const [editingExpId, setEditingExpId] = useState<string | null>(null);
+  const [expTitle, setExpTitle] = useState("");
+  const [expCompany, setExpCompany] = useState("");
+  const [expStart, setExpStart] = useState("");
+  const [expEnd, setExpEnd] = useState("");
+  const [expDesc, setExpDesc] = useState("");
+  const [expLoading, setExpLoading] = useState(false);
+  const [expMsg, setExpMsg] = useState<string | null>(null);
+
+  // Projects
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [editingProjId, setEditingProjId] = useState<string | null>(null);
+  const [projTitle, setProjTitle] = useState("");
+  const [projDesc, setProjDesc] = useState("");
+  const [projTech, setProjTech] = useState("");
+  const [projLink, setProjLink] = useState("");
+  const [projFile, setProjFile] = useState<File | null>(null);
+  const [projLoading, setProjLoading] = useState(false);
+  const [projMsg, setProjMsg] = useState<string | null>(null);
+
+  // Contact Info
+  const [contactInfo, setContactInfo] = useState<ContactInfo | null>(null);
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactLinkedin, setContactLinkedin] = useState("");
+  const [contactGithub, setContactGithub] = useState("");
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactMsg, setContactMsg] = useState<string | null>(null);
+
+  // Footer Content
+  const [footerContent, setFooterContent] = useState<FooterContent | null>(null);
+  const [footerCopyright, setFooterCopyright] = useState("");
+  const [footerLoading, setFooterLoading] = useState(false);
+  const [footerMsg, setFooterMsg] = useState<string | null>(null);
+
+  // Certificates
   const [certs, setCerts] = useState<Certificate[]>([]);
+  const [certTitle, setCertTitle] = useState("");
+  const [certInstitution, setCertInstitution] = useState("");
+  const [certDateIssued, setCertDateIssued] = useState("");
+  const [certDescription, setCertDescription] = useState("");
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [certPreviewUrl, setCertPreviewUrl] = useState<string | null>(null);
+  const [certUploading, setCertUploading] = useState(false);
+  const [certError, setCertError] = useState<string | null>(null);
+  const [certMessage, setCertMessage] = useState<string | null>(null);
 
-  // Certificate form state
-  const [title, setTitle] = useState("");
-  const [institution, setInstitution] = useState("");
-  const [dateIssued, setDateIssued] = useState("");
-  const [description, setDescription] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-
-  // Site assets
+  // Profile + CV
   const [profileAsset, setProfileAsset] = useState<SiteAsset | null>(null);
   const [profileSignedUrl, setProfileSignedUrl] = useState<string | null>(null);
   const [profileFile, setProfileFile] = useState<File | null>(null);
@@ -68,6 +203,7 @@ function AdminPage() {
   const [cvMsg, setCvMsg] = useState<string | null>(null);
   const [cvErr, setCvErr] = useState<string | null>(null);
 
+  // Initialize
   useEffect(() => {
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
@@ -78,17 +214,18 @@ function AdminPage() {
       });
       setIsAdmin(Boolean(data));
     })();
-    refresh();
-    refreshAssets();
+    loadAllData();
   }, []);
 
+  // Handle cert preview
   useEffect(() => {
-    if (!file) { setPreviewUrl(null); return; }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
+    if (!certFile) { setCertPreviewUrl(null); return; }
+    const url = URL.createObjectURL(certFile);
+    setCertPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [file]);
+  }, [certFile]);
 
+  // Handle profile preview
   useEffect(() => {
     if (!profileFile) { setProfilePreview(null); return; }
     const url = URL.createObjectURL(profileFile);
@@ -96,15 +233,88 @@ function AdminPage() {
     return () => URL.revokeObjectURL(url);
   }, [profileFile]);
 
-  async function refresh() {
-    const { data } = await supabase
-      .from("certificates")
-      .select("*")
-      .order("date_issued", { ascending: false });
+  async function loadAllData() {
+    await Promise.all([
+      loadHomeContent(),
+      loadAboutContent(),
+      loadEducation(),
+      loadExperience(),
+      loadProjects(),
+      loadContactInfo(),
+      loadFooterContent(),
+      loadCertificates(),
+      loadAssets(),
+    ]);
+  }
+
+  async function loadHomeContent() {
+    const { data } = await supabase.from("home_content").select("*").limit(1);
+    if (data && data.length > 0) {
+      const item = data[0];
+      setHomeContent(item);
+      setHomeName(item.name);
+      setHomeTitle(item.title);
+      setHomeTagline(item.tagline);
+      setHomeSummary(item.summary);
+    }
+  }
+
+  async function loadAboutContent() {
+    const { data } = await supabase.from("about_content").select("*").limit(1);
+    if (data && data.length > 0) {
+      const item = data[0];
+      setAboutContent(item);
+      setAboutPersonal(item.personal_background);
+      setAboutProfessional(item.professional_background);
+      setAboutVision(item.vision);
+      setAboutMission(item.mission);
+      setAboutGoals(item.career_goals);
+      setAboutInterests(item.interests);
+    }
+  }
+
+  async function loadEducation() {
+    const { data } = await supabase.from("education").select("*").order("display_order");
+    setEducation((data as Education[]) ?? []);
+  }
+
+  async function loadExperience() {
+    const { data } = await supabase.from("experience").select("*").order("display_order");
+    setExperience((data as Experience[]) ?? []);
+  }
+
+  async function loadProjects() {
+    const { data } = await supabase.from("projects").select("*").order("display_order");
+    setProjects((data as Project[]) ?? []);
+  }
+
+  async function loadContactInfo() {
+    const { data } = await supabase.from("contact_info").select("*").limit(1);
+    if (data && data.length > 0) {
+      const item = data[0];
+      setContactInfo(item);
+      setContactEmail(item.email);
+      setContactPhone(item.phone || "");
+      setContactLinkedin(item.linkedin || "");
+      setContactGithub(item.github || "");
+    }
+  }
+
+  async function loadFooterContent() {
+    const { data } = await supabase.from("footer_content").select("*").limit(1);
+    if (data && data.length > 0) {
+      const item = data[0];
+      setFooterContent(item);
+      setFooterCopyright(item.copyright_text);
+    }
+  }
+
+  async function loadCertificates() {
+    const { data } = await supabase.from("certificates").select("*").order("date_issued", { ascending: false });
     setCerts((data as Certificate[]) ?? []);
   }
 
-  async function refreshAssets() {
+  async function loadAssets() {
     const { data } = await supabase.from("site_assets").select("*");
     const list = (data as SiteAsset[]) ?? [];
     const p = list.find((a) => a.key === "profile_image") ?? null;
@@ -114,80 +324,392 @@ function AdminPage() {
     if (p) {
       const { data: signed } = await supabase.storage.from("profile-images").createSignedUrl(p.file_path, 3600);
       setProfileSignedUrl(signed?.signedUrl ?? null);
-    } else {
-      setProfileSignedUrl(null);
     }
   }
 
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setError(null);
-    const f = e.target.files?.[0] ?? null;
-    if (f && !CERT_ACCEPTED.includes(f.type)) {
-      setError("Only PDF, JPG, or PNG files are accepted.");
-      setFile(null); e.target.value = ""; return;
-    }
-    if (f && f.size > 10 * 1024 * 1024) {
-      setError("File must be under 10MB."); setFile(null); e.target.value = ""; return;
-    }
-    setFile(f);
-  }
-
-  async function handleUpload(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null); setMessage(null);
-    if (!file) { setError("Please choose a file."); return; }
-    setUploading(true);
+  // HOME CONTENT
+  async function saveHomeContent() {
+    setHomeLoading(true);
+    setHomeMsg(null);
     try {
-      const ext = file.name.split(".").pop() || "bin";
+      if (homeContent) {
+        await supabase.from("home_content").update({
+          name: homeName,
+          title: homeTitle,
+          tagline: homeTagline,
+          summary: homeSummary,
+        }).eq("id", homeContent.id);
+      } else {
+        await supabase.from("home_content").insert({
+          name: homeName,
+          title: homeTitle,
+          tagline: homeTagline,
+          summary: homeSummary,
+        });
+      }
+      setHomeMsg("Home content updated!");
+      await loadHomeContent();
+    } catch (err) {
+      setHomeMsg("Error: " + (err instanceof Error ? err.message : "Unknown"));
+    } finally {
+      setHomeLoading(false);
+    }
+  }
+
+  // ABOUT CONTENT
+  async function saveAboutContent() {
+    setAboutLoading(true);
+    setAboutMsg(null);
+    try {
+      if (aboutContent) {
+        await supabase.from("about_content").update({
+          personal_background: aboutPersonal,
+          professional_background: aboutProfessional,
+          vision: aboutVision,
+          mission: aboutMission,
+          career_goals: aboutGoals,
+          interests: aboutInterests,
+        }).eq("id", aboutContent.id);
+      } else {
+        await supabase.from("about_content").insert({
+          personal_background: aboutPersonal,
+          professional_background: aboutProfessional,
+          vision: aboutVision,
+          mission: aboutMission,
+          career_goals: aboutGoals,
+          interests: aboutInterests,
+        });
+      }
+      setAboutMsg("About content updated!");
+      await loadAboutContent();
+    } catch (err) {
+      setAboutMsg("Error: " + (err instanceof Error ? err.message : "Unknown"));
+    } finally {
+      setAboutLoading(false);
+    }
+  }
+
+  // EDUCATION
+  async function addEducation(e: React.FormEvent) {
+    e.preventDefault();
+    setEduLoading(true);
+    setEduMsg(null);
+    try {
+      if (editingEduId) {
+        // Update existing
+        await supabase.from("education").update({
+          institution: eduInstitution,
+          field_of_study: eduField,
+          degree: eduDegree,
+          start_date: eduStart || null,
+          end_date: eduEnd || null,
+          description: eduDesc || null,
+        }).eq("id", editingEduId);
+        setEduMsg("Education updated!");
+      } else {
+        // Add new
+        const order = education.length > 0 ? Math.max(...education.map(e => e.display_order)) + 1 : 0;
+        await supabase.from("education").insert({
+          institution: eduInstitution,
+          field_of_study: eduField,
+          degree: eduDegree,
+          start_date: eduStart || null,
+          end_date: eduEnd || null,
+          description: eduDesc || null,
+          display_order: order,
+        });
+        setEduMsg("Education added!");
+      }
+      clearEduForm();
+      await loadEducation();
+    } catch (err) {
+      setEduMsg("Error: " + (err instanceof Error ? err.message : "Unknown"));
+    } finally {
+      setEduLoading(false);
+    }
+  }
+
+  function loadEducationForEdit(edu: Education) {
+    setEditingEduId(edu.id);
+    setEduInstitution(edu.institution);
+    setEduField(edu.field_of_study);
+    setEduDegree(edu.degree);
+    setEduStart(edu.start_date || "");
+    setEduEnd(edu.end_date || "");
+    setEduDesc(edu.description || "");
+    setEduMsg(null);
+  }
+
+  function clearEduForm() {
+    setEditingEduId(null);
+    setEduInstitution("");
+    setEduField("");
+    setEduDegree("");
+    setEduStart("");
+    setEduEnd("");
+    setEduDesc("");
+    setEduMsg(null);
+  }
+
+  async function deleteEducation(id: string) {
+    if (!confirm("Delete this education record?")) return;
+    await supabase.from("education").delete().eq("id", id);
+    if (editingEduId === id) clearEduForm();
+    await loadEducation();
+  }
+
+  // EXPERIENCE
+  async function addExperience(e: React.FormEvent) {
+    e.preventDefault();
+    setExpLoading(true);
+    setExpMsg(null);
+    try {
+      if (editingExpId) {
+        // Update existing
+        await supabase.from("experience").update({
+          title: expTitle,
+          company: expCompany,
+          start_date: expStart,
+          end_date: expEnd || null,
+          description: expDesc,
+        }).eq("id", editingExpId);
+        setExpMsg("Experience updated!");
+      } else {
+        // Add new
+        const order = experience.length > 0 ? Math.max(...experience.map(e => e.display_order)) + 1 : 0;
+        await supabase.from("experience").insert({
+          title: expTitle,
+          company: expCompany,
+          start_date: expStart,
+          end_date: expEnd || null,
+          description: expDesc,
+          display_order: order,
+        });
+        setExpMsg("Experience added!");
+      }
+      clearExpForm();
+      await loadExperience();
+    } catch (err) {
+      setExpMsg("Error: " + (err instanceof Error ? err.message : "Unknown"));
+    } finally {
+      setExpLoading(false);
+    }
+  }
+
+  function loadExperienceForEdit(exp: Experience) {
+    setEditingExpId(exp.id);
+    setExpTitle(exp.title);
+    setExpCompany(exp.company);
+    setExpStart(exp.start_date);
+    setExpEnd(exp.end_date || "");
+    setExpDesc(exp.description);
+    setExpMsg(null);
+  }
+
+  function clearExpForm() {
+    setEditingExpId(null);
+    setExpTitle("");
+    setExpCompany("");
+    setExpStart("");
+    setExpEnd("");
+    setExpDesc("");
+    setExpMsg(null);
+  }
+
+  async function deleteExperience(id: string) {
+    if (!confirm("Delete this experience record?")) return;
+    await supabase.from("experience").delete().eq("id", id);
+    if (editingExpId === id) clearExpForm();
+    await loadExperience();
+  }
+
+  // PROJECTS
+  async function addProject(e: React.FormEvent) {
+    e.preventDefault();
+    setProjLoading(true);
+    setProjMsg(null);
+    try {
+      let imagePath = null;
+      let imageUrl = null;
+
+      if (projFile) {
+        const ext = projFile.name.split(".").pop() || "jpg";
+        imagePath = `projects/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("project-images").upload(imagePath, projFile);
+        if (upErr) throw upErr;
+        const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(imagePath);
+        imageUrl = urlData.publicUrl;
+      }
+
+      if (editingProjId) {
+        // Update existing - if new image, delete old one first
+        const existingProj = projects.find(p => p.id === editingProjId);
+        if (projFile && existingProj?.image_path) {
+          await supabase.storage.from("project-images").remove([existingProj.image_path]);
+        }
+        
+        await supabase.from("projects").update({
+          title: projTitle,
+          description: projDesc,
+          technologies: projTech || null,
+          link: projLink || null,
+          image_path: imagePath || existingProj?.image_path || null,
+          image_url: imageUrl || existingProj?.image_url || null,
+        }).eq("id", editingProjId);
+        setProjMsg("Project updated!");
+      } else {
+        // Add new
+        const order = projects.length > 0 ? Math.max(...projects.map(p => p.display_order)) + 1 : 0;
+        await supabase.from("projects").insert({
+          title: projTitle,
+          description: projDesc,
+          technologies: projTech || null,
+          link: projLink || null,
+          image_path: imagePath,
+          image_url: imageUrl,
+          display_order: order,
+        });
+        setProjMsg("Project added!");
+      }
+      clearProjForm();
+      await loadProjects();
+    } catch (err) {
+      setProjMsg("Error: " + (err instanceof Error ? err.message : "Unknown"));
+    } finally {
+      setProjLoading(false);
+    }
+  }
+
+  function loadProjectForEdit(proj: Project) {
+    setEditingProjId(proj.id);
+    setProjTitle(proj.title);
+    setProjDesc(proj.description);
+    setProjTech(proj.technologies || "");
+    setProjLink(proj.link || "");
+    setProjFile(null);
+    setProjMsg(null);
+  }
+
+  function clearProjForm() {
+    setEditingProjId(null);
+    setProjTitle("");
+    setProjDesc("");
+    setProjTech("");
+    setProjLink("");
+    setProjFile(null);
+    setProjMsg(null);
+  }
+
+  async function deleteProject(id: string) {
+    if (!confirm("Delete this project?")) return;
+    const proj = projects.find(p => p.id === id);
+    if (proj?.image_path) {
+      await supabase.storage.from("project-images").remove([proj.image_path]);
+    }
+    await supabase.from("projects").delete().eq("id", id);
+    if (editingProjId === id) clearProjForm();
+    await loadProjects();
+  }
+
+  // CONTACT INFO
+  async function saveContactInfo() {
+    setContactLoading(true);
+    setContactMsg(null);
+    try {
+      if (contactInfo) {
+        await supabase.from("contact_info").update({
+          email: contactEmail,
+          phone: contactPhone || null,
+          linkedin: contactLinkedin || null,
+          github: contactGithub || null,
+        }).eq("id", contactInfo.id);
+      } else {
+        await supabase.from("contact_info").insert({
+          email: contactEmail,
+          phone: contactPhone || null,
+          linkedin: contactLinkedin || null,
+          github: contactGithub || null,
+        });
+      }
+      setContactMsg("Contact info updated!");
+      await loadContactInfo();
+    } catch (err) {
+      setContactMsg("Error: " + (err instanceof Error ? err.message : "Unknown"));
+    } finally {
+      setContactLoading(false);
+    }
+  }
+
+  async function saveFooterContent() {
+    setFooterLoading(true);
+    setFooterMsg(null);
+    try {
+      if (footerContent) {
+        await supabase.from("footer_content").update({
+          copyright_text: footerCopyright,
+        }).eq("id", footerContent.id);
+      } else {
+        await supabase.from("footer_content").insert({
+          copyright_text: footerCopyright,
+        });
+      }
+      setFooterMsg("Footer content updated!");
+      await loadFooterContent();
+    } catch (err) {
+      setFooterMsg("Error: " + (err instanceof Error ? err.message : "Unknown"));
+    } finally {
+      setFooterLoading(false);
+    }
+  }
+
+  // CERTIFICATES
+  async function uploadCertificate(e: React.FormEvent) {
+    e.preventDefault();
+    setCertError(null);
+    setCertMessage(null);
+    if (!certFile) { setCertError("Please choose a file."); return; }
+    setCertUploading(true);
+    try {
+      const ext = certFile.name.split(".").pop() || "bin";
       const path = `${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from("certificates")
-        .upload(path, file, { contentType: file.type, upsert: false });
+      const { error: upErr } = await supabase.storage.from("certificates").upload(path, certFile);
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from("certificates").getPublicUrl(path);
-      const { error: insErr } = await supabase.from("certificates").insert({
-        title: title.trim(),
-        institution: institution.trim(),
-        date_issued: dateIssued,
-        description: description.trim() || null,
+      await supabase.from("certificates").insert({
+        title: certTitle,
+        institution: certInstitution,
+        date_issued: certDateIssued,
+        description: certDescription || null,
         file_url: urlData.publicUrl,
         file_path: path,
-        file_type: file.type,
+        file_type: certFile.type,
       });
-      if (insErr) throw insErr;
-      setMessage("Certificate uploaded.");
-      setTitle(""); setInstitution(""); setDateIssued(""); setDescription(""); setFile(null);
-      await refresh();
+      setCertMessage("Certificate uploaded!");
+      setCertTitle("");
+      setCertInstitution("");
+      setCertDateIssued("");
+      setCertDescription("");
+      setCertFile(null);
+      await loadCertificates();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setCertError(err instanceof Error ? err.message : "Upload failed");
     } finally {
-      setUploading(false);
+      setCertUploading(false);
     }
   }
 
-  async function handleDelete(cert: Certificate) {
+  async function deleteCertificate(cert: Certificate) {
     if (!confirm(`Delete "${cert.title}"?`)) return;
     await supabase.storage.from("certificates").remove([cert.file_path]);
     await supabase.from("certificates").delete().eq("id", cert.id);
-    await refresh();
+    await loadCertificates();
   }
 
-  function onProfileFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setProfileErr(null);
-    const f = e.target.files?.[0] ?? null;
-    if (f && !PROFILE_ACCEPTED.includes(f.type)) {
-      setProfileErr("Only JPG, PNG, or WEBP images are accepted.");
-      setProfileFile(null); e.target.value = ""; return;
-    }
-    if (f && f.size > 5 * 1024 * 1024) {
-      setProfileErr("Image must be under 5MB."); setProfileFile(null); e.target.value = ""; return;
-    }
-    setProfileFile(f);
-  }
-
-  async function handleProfileUpload(e: React.FormEvent) {
+  // PROFILE UPLOAD
+  async function uploadProfile(e: React.FormEvent) {
     e.preventDefault();
-    setProfileErr(null); setProfileMsg(null);
+    setProfileErr(null);
+    setProfileMsg(null);
     if (!profileFile) { setProfileErr("Please choose an image."); return; }
     setProfileUploading(true);
     try {
@@ -196,21 +718,18 @@ function AdminPage() {
       }
       const ext = profileFile.name.split(".").pop() || "jpg";
       const path = `${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from("profile-images")
-        .upload(path, profileFile, { contentType: profileFile.type, upsert: false });
+      const { error: upErr } = await supabase.storage.from("profile-images").upload(path, profileFile);
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from("profile-images").getPublicUrl(path);
-      const { error: insErr } = await supabase.from("site_assets").upsert({
+      await supabase.from("site_assets").upsert({
         key: "profile_image",
         file_path: path,
         file_url: urlData.publicUrl,
         file_type: profileFile.type,
       });
-      if (insErr) throw insErr;
-      setProfileMsg("Profile image updated.");
+      setProfileMsg("Profile image updated!");
       setProfileFile(null);
-      await refreshAssets();
+      await loadAssets();
     } catch (err) {
       setProfileErr(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -218,21 +737,11 @@ function AdminPage() {
     }
   }
 
-  function onCvFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setCvErr(null);
-    const f = e.target.files?.[0] ?? null;
-    if (f && f.type !== "application/pdf") {
-      setCvErr("CV must be a PDF file."); setCvFile(null); e.target.value = ""; return;
-    }
-    if (f && f.size > 10 * 1024 * 1024) {
-      setCvErr("File must be under 10MB."); setCvFile(null); e.target.value = ""; return;
-    }
-    setCvFile(f);
-  }
-
-  async function handleCvUpload(e: React.FormEvent) {
+  // CV UPLOAD
+  async function uploadCv(e: React.FormEvent) {
     e.preventDefault();
-    setCvErr(null); setCvMsg(null);
+    setCvErr(null);
+    setCvMsg(null);
     if (!cvFile) { setCvErr("Please choose a PDF."); return; }
     setCvUploading(true);
     try {
@@ -240,21 +749,18 @@ function AdminPage() {
         await supabase.storage.from("cv").remove([cvAsset.file_path]);
       }
       const path = `Simanye_Tevin_Sizini_CV-${Date.now()}.pdf`;
-      const { error: upErr } = await supabase.storage
-        .from("cv")
-        .upload(path, cvFile, { contentType: "application/pdf", upsert: false });
+      const { error: upErr } = await supabase.storage.from("cv").upload(path, cvFile);
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from("cv").getPublicUrl(path);
-      const { error: insErr } = await supabase.from("site_assets").upsert({
+      await supabase.from("site_assets").upsert({
         key: "cv",
         file_path: path,
         file_url: urlData.publicUrl,
         file_type: "application/pdf",
       });
-      if (insErr) throw insErr;
-      setCvMsg("CV updated.");
+      setCvMsg("CV updated!");
       setCvFile(null);
-      await refreshAssets();
+      await loadAssets();
     } catch (err) {
       setCvErr(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -285,12 +791,14 @@ function AdminPage() {
     );
   }
 
+  if (isAdmin === null) return <div>Loading...</div>;
+
   return (
     <SiteLayout>
       <PageHeader
         eyebrow="Admin"
         title="Manage Portfolio"
-        description="Upload your profile photo, CV, and certificates. Changes appear instantly on the public site."
+        description="Manage all portfolio content. Changes appear instantly on the public site."
       />
       <Container>
         <div className="mb-6 flex justify-end">
@@ -299,129 +807,464 @@ function AdminPage() {
           </Button>
         </div>
 
-        {/* Profile + CV row */}
-        <div className="mb-10 grid gap-6 lg:grid-cols-2">
-          <form onSubmit={handleProfileUpload} className="space-y-4 rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center gap-2">
-              <UserCircle className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Profile picture</h2>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="h-20 w-20 overflow-hidden rounded-full border border-border bg-surface">
-                {profilePreview ? (
-                  <img src={profilePreview} alt="New preview" className="h-full w-full object-cover" />
-                ) : profileSignedUrl ? (
-                  <img src={profileSignedUrl} alt="Current profile" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-muted-foreground">ST</div>
-                )}
-              </div>
-              <div className="flex-1">
-                <Label htmlFor="profile-file">Upload new image (JPG, PNG, WEBP · max 5MB)</Label>
-                <Input id="profile-file" type="file" accept="image/jpeg,image/png,image/webp" onChange={onProfileFileChange} className="mt-1.5" />
-              </div>
-            </div>
-            {profileErr && <p className="text-sm text-destructive">{profileErr}</p>}
-            {profileMsg && <p className="text-sm text-primary">{profileMsg}</p>}
-            <Button type="submit" disabled={profileUploading} className="w-full">
-              <Upload className="h-4 w-4" /> {profileUploading ? "Uploading…" : "Save profile image"}
-            </Button>
-          </form>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-4 lg:grid-cols-9">
+            <TabsTrigger value="files">Files</TabsTrigger>
+            <TabsTrigger value="home">Home</TabsTrigger>
+            <TabsTrigger value="about">About</TabsTrigger>
+            <TabsTrigger value="education">Education</TabsTrigger>
+            <TabsTrigger value="experience">Experience</TabsTrigger>
+            <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="contact">Contact</TabsTrigger>
+            <TabsTrigger value="footer">Footer</TabsTrigger>
+            <TabsTrigger value="certificates">Certificates</TabsTrigger>
+          </TabsList>
 
-          <form onSubmit={handleCvUpload} className="space-y-4 rounded-xl border border-border bg-card p-6">
-            <div className="flex items-center gap-2">
-              <FileDown className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Curriculum Vitae</h2>
-            </div>
-            <div className="rounded-md border border-border bg-surface p-3 text-sm">
-              {cvAsset ? (
-                <div className="flex items-center justify-between gap-3">
-                  <span className="truncate text-muted-foreground">Current: {cvAsset.file_path}</span>
-                  <span className="text-xs text-muted-foreground">{new Date(cvAsset.updated_at).toLocaleDateString()}</span>
+          {/* FILES TAB */}
+          <TabsContent value="files" className="space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <form onSubmit={uploadProfile} className="space-y-4 rounded-xl border border-border bg-card p-6">
+                <div className="flex items-center gap-2">
+                  <UserCircle className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Profile Picture</h2>
                 </div>
-              ) : (
-                <span className="text-muted-foreground">No CV uploaded yet.</span>
-              )}
-            </div>
-            <div>
-              <Label htmlFor="cv-file">Upload new CV (PDF · max 10MB)</Label>
-              <Input id="cv-file" type="file" accept="application/pdf" onChange={onCvFileChange} className="mt-1.5" />
-            </div>
-            {cvErr && <p className="text-sm text-destructive">{cvErr}</p>}
-            {cvMsg && <p className="text-sm text-primary">{cvMsg}</p>}
-            <Button type="submit" disabled={cvUploading} className="w-full">
-              <Upload className="h-4 w-4" /> {cvUploading ? "Uploading…" : "Save CV"}
-            </Button>
-          </form>
-        </div>
-
-        {/* Certificates */}
-        <div className="grid gap-8 lg:grid-cols-2">
-          <form onSubmit={handleUpload} className="space-y-4 rounded-xl border border-border bg-card p-6">
-            <h2 className="text-lg font-semibold">Upload new certificate</h2>
-            <div>
-              <Label htmlFor="title">Certificate title</Label>
-              <Input id="title" required value={title} onChange={(e) => setTitle(e.target.value)} maxLength={150} className="mt-1.5" />
-            </div>
-            <div>
-              <Label htmlFor="institution">Institution</Label>
-              <Input id="institution" required value={institution} onChange={(e) => setInstitution(e.target.value)} maxLength={150} className="mt-1.5" />
-            </div>
-            <div>
-              <Label htmlFor="date">Date issued</Label>
-              <Input id="date" type="date" required value={dateIssued} onChange={(e) => setDateIssued(e.target.value)} className="mt-1.5" />
-            </div>
-            <div>
-              <Label htmlFor="desc">Description (optional)</Label>
-              <Textarea id="desc" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={500} className="mt-1.5" />
-            </div>
-            <div>
-              <Label htmlFor="file">Certificate file (PDF, JPG, PNG)</Label>
-              <Input id="file" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={onFileChange} className="mt-1.5" />
-            </div>
-
-            {previewUrl && file && (
-              <div className="rounded-md border border-border bg-surface p-3">
-                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Preview</p>
-                {file.type === "application/pdf" ? (
-                  <iframe src={previewUrl} title="Preview" className="h-64 w-full rounded" />
-                ) : (
-                  <img src={previewUrl} alt="Preview" className="max-h-64 rounded object-contain" />
-                )}
-              </div>
-            )}
-
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {message && <p className="text-sm text-primary">{message}</p>}
-
-            <Button type="submit" disabled={uploading} className="w-full">
-              <Upload className="h-4 w-4" /> {uploading ? "Uploading…" : "Save certificate"}
-            </Button>
-          </form>
-
-          <div className="space-y-3">
-            <h2 className="text-lg font-semibold">Existing certificates ({certs.length})</h2>
-            {certs.length === 0 && (
-              <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-                No certificates uploaded yet.
-              </p>
-            )}
-            {certs.map((c) => (
-              <div key={c.id} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
-                  {c.file_type === "application/pdf" ? <FileText className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}
+                <div className="h-24 w-24 overflow-hidden rounded-full border border-border bg-surface">
+                  {profilePreview ? (
+                    <img src={profilePreview} alt="New" className="h-full w-full object-cover" />
+                  ) : profileSignedUrl ? (
+                    <img src={profileSignedUrl} alt="Current" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">No image</div>
+                  )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{c.title}</p>
-                  <p className="text-xs text-muted-foreground">{c.institution} · {new Date(c.date_issued).toLocaleDateString()}</p>
+                <div>
+                  <Label htmlFor="profile-file">Upload image (JPG, PNG, WEBP · max 5MB)</Label>
+                  <Input id="profile-file" type="file" accept={PROJECT_IMAGE_ACCEPTED.join(",")} onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f && !PROFILE_ACCEPTED.includes(f.type)) {
+                      setProfileErr("Only JPG, PNG, or WEBP accepted.");
+                      return;
+                    }
+                    setProfileFile(f || null);
+                  }} className="mt-1.5" />
                 </div>
-                <Button onClick={() => handleDelete(c)} variant="ghost" size="icon" aria-label="Delete">
-                  <Trash2 className="h-4 w-4 text-destructive" />
+                {profileErr && <p className="text-sm text-destructive">{profileErr}</p>}
+                {profileMsg && <p className="text-sm text-primary">{profileMsg}</p>}
+                <Button type="submit" disabled={profileUploading || !profileFile} className="w-full">
+                  <Upload className="h-4 w-4" /> {profileUploading ? "Uploading…" : "Save Profile"}
                 </Button>
+              </form>
+
+              <form onSubmit={uploadCv} className="space-y-4 rounded-xl border border-border bg-card p-6">
+                <div className="flex items-center gap-2">
+                  <FileDown className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Curriculum Vitae</h2>
+                </div>
+                <div className="rounded-md border border-border bg-surface p-3 text-sm">
+                  {cvAsset ? (
+                    <div><span className="text-muted-foreground">Updated: {new Date(cvAsset.updated_at).toLocaleDateString()}</span></div>
+                  ) : (
+                    <span className="text-muted-foreground">No CV uploaded yet.</span>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="cv-file">Upload PDF (max 10MB)</Label>
+                  <Input id="cv-file" type="file" accept="application/pdf" onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f && f.type !== "application/pdf") {
+                      setCvErr("Only PDF files accepted.");
+                      return;
+                    }
+                    setCvFile(f || null);
+                  }} className="mt-1.5" />
+                </div>
+                {cvErr && <p className="text-sm text-destructive">{cvErr}</p>}
+                {cvMsg && <p className="text-sm text-primary">{cvMsg}</p>}
+                <Button type="submit" disabled={cvUploading || !cvFile} className="w-full">
+                  <Upload className="h-4 w-4" /> {cvUploading ? "Uploading…" : "Save CV"}
+                </Button>
+              </form>
+            </div>
+          </TabsContent>
+
+          {/* HOME TAB */}
+          <TabsContent value="home">
+            <form onSubmit={(e) => { e.preventDefault(); saveHomeContent(); }} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+              <h2 className="text-lg font-semibold">Home Page Content</h2>
+              <div>
+                <Label htmlFor="home-name">Name</Label>
+                <Input id="home-name" value={homeName} onChange={(e) => setHomeName(e.target.value)} className="mt-1.5" />
               </div>
-            ))}
-          </div>
-        </div>
+              <div>
+                <Label htmlFor="home-title">Professional Title</Label>
+                <Input id="home-title" value={homeTitle} onChange={(e) => setHomeTitle(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="home-tagline">Tagline</Label>
+                <Input id="home-tagline" value={homeTagline} onChange={(e) => setHomeTagline(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="home-summary">Summary</Label>
+                <Textarea id="home-summary" value={homeSummary} onChange={(e) => setHomeSummary(e.target.value)} className="mt-1.5 min-h-24" />
+              </div>
+              {homeMsg && <p className="text-sm text-primary">{homeMsg}</p>}
+              <Button type="submit" disabled={homeLoading}>Save Home Content</Button>
+            </form>
+          </TabsContent>
+
+          {/* ABOUT TAB */}
+          <TabsContent value="about">
+            <form onSubmit={(e) => { e.preventDefault(); saveAboutContent(); }} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+              <h2 className="text-lg font-semibold">About Page Content</h2>
+              <div>
+                <Label htmlFor="about-personal">Personal Background</Label>
+                <Textarea id="about-personal" value={aboutPersonal} onChange={(e) => setAboutPersonal(e.target.value)} className="mt-1.5 min-h-24" />
+              </div>
+              <div>
+                <Label htmlFor="about-professional">Professional Background</Label>
+                <Textarea id="about-professional" value={aboutProfessional} onChange={(e) => setAboutProfessional(e.target.value)} className="mt-1.5 min-h-24" />
+              </div>
+              <div>
+                <Label htmlFor="about-vision">Vision</Label>
+                <Textarea id="about-vision" value={aboutVision} onChange={(e) => setAboutVision(e.target.value)} className="mt-1.5 min-h-20" />
+              </div>
+              <div>
+                <Label htmlFor="about-mission">Mission</Label>
+                <Textarea id="about-mission" value={aboutMission} onChange={(e) => setAboutMission(e.target.value)} className="mt-1.5 min-h-20" />
+              </div>
+              <div>
+                <Label htmlFor="about-goals">Career Goals</Label>
+                <Textarea id="about-goals" value={aboutGoals} onChange={(e) => setAboutGoals(e.target.value)} className="mt-1.5 min-h-20" />
+              </div>
+              <div>
+                <Label htmlFor="about-interests">Interests</Label>
+                <Textarea id="about-interests" value={aboutInterests} onChange={(e) => setAboutInterests(e.target.value)} className="mt-1.5 min-h-20" />
+              </div>
+              {aboutMsg && <p className="text-sm text-primary">{aboutMsg}</p>}
+              <Button type="submit" disabled={aboutLoading}>Save About Content</Button>
+            </form>
+          </TabsContent>
+
+          {/* EDUCATION TAB */}
+          <TabsContent value="education" className="space-y-6">
+            <form onSubmit={addEducation} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">
+                  {editingEduId ? "Edit Education" : "Add Education"}
+                </h2>
+                {editingEduId && (
+                  <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">
+                    Editing
+                  </span>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="edu-institution">Institution</Label>
+                <Input id="edu-institution" required value={eduInstitution} onChange={(e) => setEduInstitution(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="edu-field">Field of Study</Label>
+                <Input id="edu-field" required value={eduField} onChange={(e) => setEduField(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="edu-degree">Degree/Qualification</Label>
+                <Input id="edu-degree" required value={eduDegree} onChange={(e) => setEduDegree(e.target.value)} className="mt-1.5" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="edu-start">Start Date</Label>
+                  <Input id="edu-start" type="date" value={eduStart} onChange={(e) => setEduStart(e.target.value)} className="mt-1.5" />
+                </div>
+                <div>
+                  <Label htmlFor="edu-end">End Date (Optional)</Label>
+                  <Input id="edu-end" type="date" value={eduEnd} onChange={(e) => setEduEnd(e.target.value)} className="mt-1.5" />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="edu-desc">Description (Optional)</Label>
+                <Textarea id="edu-desc" value={eduDesc} onChange={(e) => setEduDesc(e.target.value)} className="mt-1.5 min-h-20" />
+              </div>
+              {eduMsg && <p className="text-sm text-primary">{eduMsg}</p>}
+              <div className="flex gap-3">
+                <Button type="submit" disabled={eduLoading} className="flex-1">
+                  <Plus className="h-4 w-4" /> {editingEduId ? "Update Education" : "Add Education"}
+                </Button>
+                {editingEduId && (
+                  <Button type="button" onClick={clearEduForm} variant="outline" className="flex-1">
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+
+            <div className="space-y-3">
+              <h3 className="font-semibold">Education Records ({education.length})</h3>
+              {education.map((edu) => (
+                <div key={edu.id} className={`flex items-start justify-between gap-3 rounded-xl border p-4 ${editingEduId === edu.id ? "border-primary bg-card/50 ring-1 ring-primary" : "border-border bg-card"}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold">{edu.degree} in {edu.field_of_study}</p>
+                    <p className="text-sm text-muted-foreground">{edu.institution}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {edu.start_date ? new Date(edu.start_date).toLocaleDateString() : "N/A"}
+                      {edu.end_date ? ` – ${new Date(edu.end_date).toLocaleDateString()}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => loadEducationForEdit(edu)} variant="ghost" size="icon" title="Edit">
+                      <Edit2 className="h-4 w-4 text-primary" />
+                    </Button>
+                    <Button onClick={() => deleteEducation(edu.id)} variant="ghost" size="icon" title="Delete">
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* EXPERIENCE TAB */}
+          <TabsContent value="experience" className="space-y-6">
+            <form onSubmit={addExperience} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">
+                  {editingExpId ? "Edit Experience" : "Add Experience"}
+                </h2>
+                {editingExpId && (
+                  <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">
+                    Editing
+                  </span>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="exp-title">Job Title</Label>
+                <Input id="exp-title" required value={expTitle} onChange={(e) => setExpTitle(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="exp-company">Company</Label>
+                <Input id="exp-company" required value={expCompany} onChange={(e) => setExpCompany(e.target.value)} className="mt-1.5" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="exp-start">Start Date</Label>
+                  <Input id="exp-start" type="date" required value={expStart} onChange={(e) => setExpStart(e.target.value)} className="mt-1.5" />
+                </div>
+                <div>
+                  <Label htmlFor="exp-end">End Date (Optional)</Label>
+                  <Input id="exp-end" type="date" value={expEnd} onChange={(e) => setExpEnd(e.target.value)} className="mt-1.5" />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="exp-desc">Description</Label>
+                <Textarea id="exp-desc" required value={expDesc} onChange={(e) => setExpDesc(e.target.value)} className="mt-1.5 min-h-24" />
+              </div>
+              {expMsg && <p className="text-sm text-primary">{expMsg}</p>}
+              <div className="flex gap-3">
+                <Button type="submit" disabled={expLoading} className="flex-1">
+                  <Plus className="h-4 w-4" /> {editingExpId ? "Update Experience" : "Add Experience"}
+                </Button>
+                {editingExpId && (
+                  <Button type="button" onClick={clearExpForm} variant="outline" className="flex-1">
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+
+            <div className="space-y-3">
+              <h3 className="font-semibold">Experience Records ({experience.length})</h3>
+              {experience.map((exp) => (
+                <div key={exp.id} className={`flex items-start justify-between gap-3 rounded-xl border p-4 ${editingExpId === exp.id ? "border-primary bg-card/50 ring-1 ring-primary" : "border-border bg-card"}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold">{exp.title}</p>
+                    <p className="text-sm text-muted-foreground">{exp.company}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(exp.start_date).toLocaleDateString()} – {exp.end_date ? new Date(exp.end_date).toLocaleDateString() : "Present"}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => loadExperienceForEdit(exp)} variant="ghost" size="icon" title="Edit">
+                      <Edit2 className="h-4 w-4 text-primary" />
+                    </Button>
+                    <Button onClick={() => deleteExperience(exp.id)} variant="ghost" size="icon" title="Delete">
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* PROJECTS TAB */}
+          <TabsContent value="projects" className="space-y-6">
+            <form onSubmit={addProject} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">
+                  {editingProjId ? "Edit Project" : "Add Project"}
+                </h2>
+                {editingProjId && (
+                  <span className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground">
+                    Editing
+                  </span>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="proj-title">Project Title</Label>
+                <Input id="proj-title" required value={projTitle} onChange={(e) => setProjTitle(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="proj-desc">Description</Label>
+                <Textarea id="proj-desc" required value={projDesc} onChange={(e) => setProjDesc(e.target.value)} className="mt-1.5 min-h-24" />
+              </div>
+              <div>
+                <Label htmlFor="proj-tech">Technologies (comma-separated, optional)</Label>
+                <Input id="proj-tech" value={projTech} onChange={(e) => setProjTech(e.target.value)} className="mt-1.5" placeholder="React, TypeScript, Tailwind" />
+              </div>
+              <div>
+                <Label htmlFor="proj-link">Project Link (optional)</Label>
+                <Input id="proj-link" type="url" value={projLink} onChange={(e) => setProjLink(e.target.value)} className="mt-1.5" placeholder="https://..." />
+              </div>
+              <div>
+                <Label htmlFor="proj-image">Project Image (optional)</Label>
+                <Input id="proj-image" type="file" accept={PROJECT_IMAGE_ACCEPTED.join(",")} onChange={(e) => setProjFile(e.target.files?.[0] || null)} className="mt-1.5" />
+                {editingProjId && projects.find(p => p.id === editingProjId)?.image_url && !projFile && (
+                  <p className="mt-2 text-xs text-muted-foreground">Current image exists. Upload new to replace.</p>
+                )}
+              </div>
+              {projMsg && <p className="text-sm text-primary">{projMsg}</p>}
+              <div className="flex gap-3">
+                <Button type="submit" disabled={projLoading} className="flex-1">
+                  <Plus className="h-4 w-4" /> {editingProjId ? "Update Project" : "Add Project"}
+                </Button>
+                {editingProjId && (
+                  <Button type="button" onClick={clearProjForm} variant="outline" className="flex-1">
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            </form>
+
+            <div className="space-y-3">
+              <h3 className="font-semibold">Projects ({projects.length})</h3>
+              {projects.map((proj) => (
+                <div key={proj.id} className={`flex items-start justify-between gap-3 rounded-xl border p-4 ${editingProjId === proj.id ? "border-primary bg-card/50 ring-1 ring-primary" : "border-border bg-card"}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold">{proj.title}</p>
+                    <p className="text-sm text-muted-foreground truncate">{proj.description}</p>
+                    {proj.technologies && <p className="text-xs text-muted-foreground">{proj.technologies}</p>}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => loadProjectForEdit(proj)} variant="ghost" size="icon" title="Edit">
+                      <Edit2 className="h-4 w-4 text-primary" />
+                    </Button>
+                    <Button onClick={() => deleteProject(proj.id)} variant="ghost" size="icon" title="Delete">
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+
+          {/* CONTACT TAB */}
+          <TabsContent value="contact">
+            <form onSubmit={(e) => { e.preventDefault(); saveContactInfo(); }} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+              <h2 className="text-lg font-semibold">Contact Information</h2>
+              <div>
+                <Label htmlFor="contact-email">Email</Label>
+                <Input id="contact-email" type="email" required value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="contact-phone">Phone (optional)</Label>
+                <Input id="contact-phone" type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="contact-linkedin">LinkedIn URL (optional)</Label>
+                <Input id="contact-linkedin" type="url" value={contactLinkedin} onChange={(e) => setContactLinkedin(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
+                <Label htmlFor="contact-github">GitHub URL (optional)</Label>
+                <Input id="contact-github" type="url" value={contactGithub} onChange={(e) => setContactGithub(e.target.value)} className="mt-1.5" />
+              </div>
+              {contactMsg && <p className="text-sm text-primary">{contactMsg}</p>}
+              <Button type="submit" disabled={contactLoading}>Save Contact Info</Button>
+            </form>
+          </TabsContent>
+
+          {/* FOOTER TAB */}
+          <TabsContent value="footer">
+            <form onSubmit={(e) => { e.preventDefault(); saveFooterContent(); }} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+              <h2 className="text-lg font-semibold">Footer Content</h2>
+              <div>
+                <Label htmlFor="footer-copyright">Copyright Text</Label>
+                <Textarea id="footer-copyright" value={footerCopyright} onChange={(e) => setFooterCopyright(e.target.value)} className="mt-1.5 min-h-24" />
+              </div>
+              {footerMsg && <p className="text-sm text-primary">{footerMsg}</p>}
+              <Button type="submit" disabled={footerLoading}>Save Footer Content</Button>
+            </form>
+          </TabsContent>
+
+          {/* CERTIFICATES TAB */}
+          <TabsContent value="certificates" className="space-y-6">
+            <div className="grid gap-8 lg:grid-cols-2">
+              <form onSubmit={uploadCertificate} className="space-y-4 rounded-xl border border-border bg-card p-6">
+                <h2 className="text-lg font-semibold">Upload Certificate</h2>
+                <div>
+                  <Label htmlFor="cert-title">Certificate Title</Label>
+                  <Input id="cert-title" required value={certTitle} onChange={(e) => setCertTitle(e.target.value)} className="mt-1.5" />
+                </div>
+                <div>
+                  <Label htmlFor="cert-institution">Institution</Label>
+                  <Input id="cert-institution" required value={certInstitution} onChange={(e) => setCertInstitution(e.target.value)} className="mt-1.5" />
+                </div>
+                <div>
+                  <Label htmlFor="cert-date">Date Issued</Label>
+                  <Input id="cert-date" type="date" required value={certDateIssued} onChange={(e) => setCertDateIssued(e.target.value)} className="mt-1.5" />
+                </div>
+                <div>
+                  <Label htmlFor="cert-desc">Description (optional)</Label>
+                  <Textarea id="cert-desc" value={certDescription} onChange={(e) => setCertDescription(e.target.value)} className="mt-1.5 min-h-20" />
+                </div>
+                <div>
+                  <Label htmlFor="cert-file">Certificate File (PDF, JPG, PNG)</Label>
+                  <Input id="cert-file" type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setCertFile(e.target.files?.[0] || null)} className="mt-1.5" />
+                </div>
+                {certPreviewUrl && certFile && (
+                  <div className="rounded-md border border-border bg-surface p-3">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">PREVIEW</p>
+                    {certFile.type === "application/pdf" ? (
+                      <iframe src={certPreviewUrl} title="Preview" className="h-64 w-full rounded" />
+                    ) : (
+                      <img src={certPreviewUrl} alt="Preview" className="max-h-64 rounded object-contain" />
+                    )}
+                  </div>
+                )}
+                {certError && <p className="text-sm text-destructive">{certError}</p>}
+                {certMessage && <p className="text-sm text-primary">{certMessage}</p>}
+                <Button type="submit" disabled={certUploading} className="w-full">
+                  <Upload className="h-4 w-4" /> {certUploading ? "Uploading…" : "Upload Certificate"}
+                </Button>
+              </form>
+
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold">Certificates ({certs.length})</h2>
+                {certs.map((c) => (
+                  <div key={c.id} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
+                      {c.file_type === "application/pdf" ? <FileText className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate font-semibold">{c.title}</p>
+                      <p className="text-xs text-muted-foreground">{c.institution} · {new Date(c.date_issued).toLocaleDateString()}</p>
+                    </div>
+                    <Button onClick={() => deleteCertificate(c)} variant="ghost" size="icon">
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </Container>
     </SiteLayout>
   );

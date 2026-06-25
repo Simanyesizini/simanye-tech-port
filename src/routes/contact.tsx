@@ -1,10 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
-import { Mail, Phone, Linkedin, Download, Send, CheckCircle2 } from "lucide-react";
+import { Mail, Phone, Github, Linkedin, Download, Send, CheckCircle2 } from "lucide-react";
 import { z } from "zod";
 import { getSignedAssetUrl } from "@/lib/site-assets";
 
+type ContactInfo = {
+  email: string;
+  phone: string | null;
+  linkedin: string | null;
+  github: string | null;
+};
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -26,9 +33,16 @@ function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [cvUrl, setCvUrl] = useState<string | null>(null);
+  const [contactInfo, setContactInfo] = useState<ContactInfo | null>(null);
 
   useEffect(() => {
     getSignedAssetUrl("cv", "cv").then(setCvUrl);
+    (async () => {
+      const { data } = await supabase.from("contact_info").select("*").limit(1);
+      if (data && data.length > 0) {
+        setContactInfo(data[0]);
+      }
+    })();
   }, []);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -48,7 +62,8 @@ function ContactPage() {
     setErrors({});
     const subject = encodeURIComponent(`Portfolio enquiry from ${parsed.data.name}`);
     const body = encodeURIComponent(`${parsed.data.message}\n\n— ${parsed.data.name} (${parsed.data.email})`);
-    window.location.href = `mailto:Simanyetevin@gmail.com?subject=${subject}&body=${body}`;
+    const toEmail = contactInfo?.email ?? "Simanyetevin@gmail.com";
+    window.location.href = `mailto:${toEmail}?subject=${subject}&body=${body}`;
     setSubmitted(true);
   }
 
@@ -79,25 +94,32 @@ function ContactPage() {
         <div className="grid gap-10 md:grid-cols-[1fr_1.3fr]">
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">Contact details</h2>
-            <a href="mailto:Simanyetevin@gmail.com" className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 hover:bg-muted">
+            <a href={`mailto:${contactInfo?.email ?? "Simanyetevin@gmail.com"}`} className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 hover:bg-muted">
               <Mail className="mt-0.5 h-5 w-5 text-primary" />
               <div>
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Email</div>
-                <div className="text-sm font-medium">Simanyetevin@gmail.com</div>
+                <div className="text-sm font-medium">{contactInfo?.email ?? "Simanyetevin@gmail.com"}</div>
               </div>
             </a>
-            <a href="tel:+27640951511" className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 hover:bg-muted">
+            <a href={`tel:${contactInfo?.phone ? contactInfo.phone.replace(/\s+/g, "") : "+27640951511"}`} className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 hover:bg-muted">
               <Phone className="mt-0.5 h-5 w-5 text-primary" />
               <div>
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">Phone</div>
-                <div className="text-sm font-medium">064 095 1511</div>
+                <div className="text-sm font-medium">{contactInfo?.phone ?? "064 095 1511"}</div>
               </div>
             </a>
-            <a href="https://linkedin.com/in/simanye-sizini-59169a340" target="_blank" rel="noreferrer" className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 hover:bg-muted">
+            <a href={contactInfo?.github ?? "https://github.com/Simanyesizini"} target="_blank" rel="noreferrer" className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 hover:bg-muted">
+              <Github className="mt-0.5 h-5 w-5 text-primary" />
+              <div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground">GitHub</div>
+                <div className="text-sm font-medium">{contactInfo?.github ? contactInfo.github.replace(/https?:\/\//, "") : "Simanyesizini"}</div>
+              </div>
+            </a>
+            <a href={contactInfo?.linkedin ?? "https://linkedin.com/in/simanye-sizini-59169a340"} target="_blank" rel="noreferrer" className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 hover:bg-muted">
               <Linkedin className="mt-0.5 h-5 w-5 text-primary" />
               <div>
                 <div className="text-xs uppercase tracking-wider text-muted-foreground">LinkedIn</div>
-                <div className="text-sm font-medium">Simanye Sizini</div>
+                <div className="text-sm font-medium">{contactInfo?.linkedin ? contactInfo.linkedin.replace(/https?:\/\//, "") : "Simanye Sizini"}</div>
               </div>
             </a>
           </div>

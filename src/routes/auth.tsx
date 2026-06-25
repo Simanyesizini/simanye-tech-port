@@ -17,10 +17,11 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "reset">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -32,20 +33,20 @@ function AuthPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setMessage(null);
     setLoading(true);
     try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: `${window.location.origin}/admin` },
+      if (mode === "reset") {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          options: { emailRedirectTo: `${window.location.origin}/auth` },
         });
         if (error) throw error;
+        setMessage("Password reset instructions have been sent to your email.");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        navigate({ to: "/admin" });
       }
-      navigate({ to: "/admin" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
@@ -64,7 +65,7 @@ function AuthPage() {
             <div>
               <h1 className="text-xl font-semibold">Admin Access</h1>
               <p className="text-sm text-muted-foreground">
-                {mode === "signin" ? "Sign in to manage certificates" : "Create the admin account"}
+                {mode === "signin" ? "Sign in to manage certificates" : "Reset your password to regain access"}
               </p>
             </div>
           </div>
@@ -73,28 +74,26 @@ function AuthPage() {
               <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1.5" />
             </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1.5" />
-            </div>
+            {mode === "signin" && (
+              <div>
+                <Label htmlFor="password">Password</Label>
+                <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1.5" />
+              </div>
+            )}
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" disabled={loading} className="w-full">
-              {loading ? "Please wait…" : mode === "signin" ? "Sign In" : "Create Account"}
+              {loading ? "Please wait…" : mode === "reset" ? "Send reset link" : "Sign In"}
             </Button>
           </form>
           <div className="mt-5 text-center text-sm text-muted-foreground">
-            {mode === "signin" ? (
-              <>No account yet?{" "}
-                <button type="button" onClick={() => setMode("signup")} className="font-medium text-primary hover:underline">
-                  Create one
-                </button>
-              </>
+            {mode === "reset" ? (
+              <button type="button" onClick={() => { setMode("signin"); setError(null); setMessage(null); }} className="font-medium text-primary hover:underline">
+                Back to sign in
+              </button>
             ) : (
-              <>Already have an account?{" "}
-                <button type="button" onClick={() => setMode("signin")} className="font-medium text-primary hover:underline">
-                  Sign in
-                </button>
-              </>
+              <button type="button" onClick={() => { setMode("reset"); setError(null); setMessage(null); }} className="font-medium text-primary hover:underline">
+                Forgot password?
+              </button>
             )}
           </div>
           <p className="mt-6 text-center text-xs text-muted-foreground">

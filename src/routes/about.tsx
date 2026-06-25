@@ -1,6 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
 import { Target, Compass, TrendingUp, Sparkles } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+
+type AboutContent = {
+  personal_background: string;
+  professional_background: string;
+  vision: string;
+  mission: string;
+  career_goals: string;
+  interests: string;
+};
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -22,6 +33,26 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function AboutPage() {
+  const [aboutContent, setAboutContent] = useState<AboutContent | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("about_content").select("*").limit(1);
+      if (data && data.length > 0) {
+        setAboutContent(data[0]);
+      }
+    })();
+  }, []);
+
+  const content = aboutContent || {
+    personal_background: "I am Simanye Tevin Sizini, a young IT professional with a calm, methodical approach to problem-solving. I value continuous learning, clear communication, and supporting the people behind the technology I work with.",
+    professional_background: "I recently completed a Diploma in IT Support Services at Nelson Mandela University after earning a Higher Certificate in IT User Support Services. My academic journey has given me a strong foundation in systems, troubleshooting and end-user support.",
+    vision: "Becoming a skilled IT Support professional contributing to efficient IT environments.",
+    mission: "To continuously improve technical and problem-solving skills while delivering reliable IT support.",
+    career_goals: "Entry-level IT Support → Systems Support → IT Specialist roles.",
+    interests: "IT Support · Systems troubleshooting · Networking · End-user support.",
+  };
+
   return (
     <SiteLayout>
       <PageHeader
@@ -33,14 +64,12 @@ function AboutPage() {
         <div className="grid gap-12 md:grid-cols-[2fr_1fr]">
           <div className="space-y-10">
             <Section title="Personal Background">
-              I am Simanye Tevin Sizini, a young IT professional with a calm, methodical approach to problem-solving.
-              I value continuous learning, clear communication, and supporting the people behind the technology I work with.
+              {content.personal_background}
             </Section>
             <Section title="Professional Background">
-              I recently completed a Diploma in IT Support Services at Nelson Mandela University after earning a Higher Certificate in IT User Support Services.
-              My academic journey has given me a strong foundation in systems, troubleshooting and end-user support.
+              {content.professional_background}
             </Section>
-            <Section title="CAPACITI Candidate · April 2026 – Present">
+            <Section title="CAPACITI INTERN · April 2026 – Present">
               I am currently a candidate in the CAPACITI program — a structured IT training and workplace-readiness program where I am building real-world technical and professional skills, collaborating in teams, and gaining exposure to industry systems and practices.
             </Section>
             <Section title="Reflective Positioning">
@@ -53,10 +82,10 @@ function AboutPage() {
 
           <aside className="space-y-6">
             {[
-              { icon: Compass, title: "Vision", body: "Becoming a skilled IT Support professional contributing to efficient IT environments." },
-              { icon: Target, title: "Mission", body: "To continuously improve technical and problem-solving skills while delivering reliable IT support." },
-              { icon: TrendingUp, title: "Career Goals", body: "Entry-level IT Support → Systems Support → IT Specialist roles." },
-              { icon: Sparkles, title: "Professional Interests", body: "IT Support · Systems troubleshooting · Networking · End-user support." },
+              { icon: Compass, title: "Vision", body: content.vision },
+              { icon: Target, title: "Mission", body: content.mission },
+              { icon: TrendingUp, title: "Career Goals", body: content.career_goals },
+              { icon: Sparkles, title: "Professional Interests", body: content.interests },
             ].map((c) => (
               <div key={c.title} className="rounded-xl border border-border bg-card p-6">
                 <c.icon className="h-5 w-5 text-primary" />

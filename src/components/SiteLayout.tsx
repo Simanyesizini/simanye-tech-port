@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
-import { Menu, X, Mail, Linkedin } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Menu, X, Mail, Phone, Github, Linkedin } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Home" },
@@ -12,14 +13,24 @@ const navItems = [
   { to: "/contact", label: "Contact" },
 ] as const;
 
+type FooterContent = {
+  copyright_text: string;
+};
+
+type ContactInfo = {
+  email: string;
+  phone: string | null;
+  linkedin: string | null;
+  github: string | null;
+};
+
 function Header() {
   const [open, setOpen] = useState(false);
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
-        <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold">ST</span>
-          <span className="hidden sm:inline">Simanye Sizini</span>
+        <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight text-foreground">
+          Simanye Sizini
         </Link>
         <nav className="hidden md:flex items-center gap-1">
           {navItems.map((item) => (
@@ -65,16 +76,40 @@ function Header() {
 }
 
 function Footer() {
+  const [contactInfo, setContactInfo] = useState<ContactInfo | null>(null);
+  const [footerContent, setFooterContent] = useState<FooterContent | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const [{ data: contactData }, { data: footerData }] = await Promise.all([
+        supabase.from("contact_info").select("*").limit(1),
+        supabase.from("footer_content").select("*").limit(1),
+      ]);
+
+      if (contactData && contactData.length > 0) {
+        setContactInfo(contactData[0]);
+      }
+      if (footerData && footerData.length > 0) {
+        setFooterContent(footerData[0]);
+      }
+    })();
+  }, []);
+
+  const email = contactInfo?.email ?? "Simanyetevin@gmail.com";
+  const phone = contactInfo?.phone ?? "064 095 1511";
+  const githubUrl = contactInfo?.github ?? "https://github.com/Simanyesizini";
+  const linkedInUrl = contactInfo?.linkedin ?? "https://linkedin.com/in/simanye-sizini-59169a340";
+  const copyrightText = footerContent?.copyright_text ?? "© 2026 Simanye Tevin Sizini. All rights reserved.";
+
   return (
     <footer className="mt-24 border-t border-border bg-surface">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 sm:px-8 md:grid-cols-3">
         <div>
-          <div className="flex items-center gap-2 font-semibold">
-            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold">ST</span>
+          <div className="font-semibold">
             Simanye Tevin Sizini
           </div>
           <p className="mt-3 text-sm text-muted-foreground max-w-xs">
-            IT Support graduate and CAPACITI Candidate passionate about solving technical problems and supporting efficient digital environments.
+            IT Support graduate and CAPACITI INTERN passionate about solving technical problems and supporting efficient digital environments.
           </p>
         </div>
         <div>
@@ -91,12 +126,22 @@ function Footer() {
           <h4 className="text-sm font-semibold">Contact</h4>
           <ul className="mt-3 space-y-2 text-sm">
             <li>
-              <a href="mailto:Simanyetevin@gmail.com" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
-                <Mail className="h-4 w-4" /> Simanyetevin@gmail.com
+              <a href={`mailto:${email}`} className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
+                <Mail className="h-4 w-4" /> {email}
               </a>
             </li>
             <li>
-              <a href="https://linkedin.com/in/simanye-sizini-59169a340" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
+              <a href={`tel:${phone.replace(/\s+/g, "")}`} className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
+                <Phone className="h-4 w-4" /> {phone}
+              </a>
+            </li>
+            <li>
+              <a href={githubUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
+                <Github className="h-4 w-4" /> GitHub
+              </a>
+            </li>
+            <li>
+              <a href={linkedInUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
                 <Linkedin className="h-4 w-4" /> LinkedIn
               </a>
             </li>
@@ -105,7 +150,7 @@ function Footer() {
       </div>
       <div className="border-t border-border">
         <div className="mx-auto max-w-6xl px-5 py-5 sm:px-8 text-xs text-muted-foreground">
-          © 2026 Simanye Tevin Sizini. All rights reserved.
+          {copyrightText}
         </div>
       </div>
     </footer>
