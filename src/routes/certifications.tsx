@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
-import { BadgeCheck, FileText, ImageIcon, Search, ExternalLink, X, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { BadgeCheck, FileText, Search, X, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
@@ -34,7 +34,6 @@ function CertificationsPage() {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewing, setViewing] = useState<Certificate | null>(null);
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const autoplayRef = useRef<number | null>(null);
@@ -51,18 +50,6 @@ function CertificationsPage() {
       setLoading(false);
     })();
   }, []);
-
-  useEffect(() => {
-    if (!viewing) { setSignedUrl(null); return; }
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase.storage
-        .from("certificates")
-        .createSignedUrl(viewing.file_path, 3600);
-      if (!cancelled) setSignedUrl(data?.signedUrl ?? null);
-    })();
-    return () => { cancelled = true; };
-  }, [viewing]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -100,9 +87,13 @@ function CertificationsPage() {
     if (selectedIndex >= filtered.length) setSelectedIndex(0);
   }, [filtered, selectedIndex]);
 
-  const current = filtered[selectedIndex] ?? null;
-
   const hasResults = filtered.length > 0;
+
+  function getCertificateUrl(cert: Certificate) {
+    if (cert.file_url) return cert.file_url;
+    const { data } = supabase.storage.from("certificates").getPublicUrl(cert.file_path);
+    return data.publicUrl;
+  }
 
   function scrollToIndex(index: number) {
     if (!carouselRef.current) return;
@@ -236,7 +227,7 @@ function CertificationsPage() {
                         <FileText className="h-12 w-12" />
                       </div>
                     ) : (
-                      <img src={cert.file_url} alt={cert.title} className="h-full w-full object-cover" />
+                      <img src={getCertificateUrl(cert)} alt={cert.title} className="h-full w-full object-cover" />
                     )}
                   </div>
                   <div className="mt-5 space-y-3">
@@ -286,29 +277,29 @@ function CertificationsPage() {
                 >
                   <X className="h-5 w-5" />
                 </button>
-                {signedUrl ? (
+                {viewing.file_url || viewing.file_path ? (
                   viewing.file_type === "application/pdf" ? (
-                    <iframe src={signedUrl} title={viewing.title} className="h-full w-full" />
+                    <iframe src={getCertificateUrl(viewing)} title={viewing.title} className="h-full w-full" />
                   ) : (
-                    <img src={signedUrl} alt={viewing.title} className="h-full w-full object-contain" />
+                    <img src={getCertificateUrl(viewing)} alt={viewing.title} className="h-full w-full object-contain" />
                   )
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading viewer…</div>
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Certificate file unavailable.</div>
                 )}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4">
                 <div className="text-sm text-muted-foreground">Full-screen support available via browser controls.</div>
                 <div className="flex gap-2">
-                  {signedUrl && (
+                  {(viewing.file_url || viewing.file_path) && (
                     <>
-                      <Button asChild size=\"sm\" variant=\"outline\">
-                        <a href={signedUrl} target=\"_blank\" rel=\"noreferrer\" download>
-                          <Download className=\"h-3.5 w-3.5\" />
+                      <Button asChild size="sm" variant="outline">
+                        <a href={getCertificateUrl(viewing)} target="_blank" rel="noreferrer" download>
+                          <Download className="h-3.5 w-3.5" />
                           Download
                         </a>
                       </Button>
-                      <Button asChild size=\"sm\" variant=\"outline\">
-                        <a href={signedUrl} target=\"_blank\" rel=\"noreferrer\">Open in new tab</a>
+                      <Button asChild size="sm" variant="outline">
+                        <a href={getCertificateUrl(viewing)} target="_blank" rel="noreferrer">Open in new tab</a>
                       </Button>
                     </>
                   )}

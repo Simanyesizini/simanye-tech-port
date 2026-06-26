@@ -1,13 +1,33 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { ProjectCardMedia } from "@/components/ProjectCardMedia";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, ImageIcon, LogOut, Trash2, Upload, UserCircle, FileDown, Plus, Edit2 } from "lucide-react";
+import {
+  Edit2,
+  ExternalLink,
+  FileDown,
+  FileText,
+  ImageIcon,
+  LogOut,
+  Plus,
+  Trash2,
+  Upload,
+  UserCircle,
+} from "lucide-react";
+import {
+  convertSupabaseProjects,
+  parseProjectTechnologies,
+  readProjectImageFile,
+  readStoredPortfolioProjects,
+  saveStoredPortfolioProjects,
+  type StoredPortfolioProject,
+} from "@/lib/local-projects";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -74,16 +94,7 @@ type Experience = {
   display_order: number;
 };
 
-type Project = {
-  id: string;
-  title: string;
-  description: string;
-  technologies: string | null;
-  link: string | null;
-  image_path: string | null;
-  image_url: string | null;
-  display_order: number;
-};
+type Project = StoredPortfolioProject;
 
 type ContactInfo = {
   id: string;
@@ -98,9 +109,30 @@ type FooterContent = {
   copyright_text: string;
 };
 
-const CERT_ACCEPTED = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
+const CERT_ACCEPTED = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+const CERT_EXTENSIONS = ["pdf", "png", "jpg", "jpeg", "webp"];
 const PROFILE_ACCEPTED = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
 const PROJECT_IMAGE_ACCEPTED = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
+
+function getFileExtension(fileName: string) {
+  return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+function getSafeFileName(fileName: string) {
+  const ext = getFileExtension(fileName);
+  const baseName = fileName
+    .replace(/\.[^.]+$/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 60);
+  return `${baseName || "certificate"}-${crypto.randomUUID()}.${ext}`;
+}
+
+function isAcceptedCertificateFile(file: File) {
+  const ext = getFileExtension(file.name);
+  return CERT_EXTENSIONS.includes(ext) && CERT_ACCEPTED.includes(file.type);
+}
 
 function AdminPage() {
   const navigate = useNavigate();
@@ -158,6 +190,7 @@ function AdminPage() {
   const [projTech, setProjTech] = useState("");
   const [projLink, setProjLink] = useState("");
   const [projFile, setProjFile] = useState<File | null>(null);
+  const [projFileInputKey, setProjFileInputKey] = useState(0);
   const [projLoading, setProjLoading] = useState(false);
   const [projMsg, setProjMsg] = useState<string | null>(null);
 
@@ -183,6 +216,7 @@ function AdminPage() {
   const [certDateIssued, setCertDateIssued] = useState("");
   const [certDescription, setCertDescription] = useState("");
   const [certFile, setCertFile] = useState<File | null>(null);
+  const [certFileInputKey, setCertFileInputKey] = useState(0);
   const [certPreviewUrl, setCertPreviewUrl] = useState<string | null>(null);
   const [certUploading, setCertUploading] = useState(false);
   const [certError, setCertError] = useState<string | null>(null);
@@ -219,7 +253,10 @@ function AdminPage() {
 
   // Handle cert preview
   useEffect(() => {
-    if (!certFile) { setCertPreviewUrl(null); return; }
+    if (!certFile) {
+      setCertPreviewUrl(null);
+      return;
+    }
     const url = URL.createObjectURL(certFile);
     setCertPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
@@ -227,7 +264,10 @@ function AdminPage() {
 
   // Handle profile preview
   useEffect(() => {
-    if (!profileFile) { setProfilePreview(null); return; }
+    if (!profileFile) {
+      setProfilePreview(null);
+      return;
+    }
     const url = URL.createObjectURL(profileFile);
     setProfilePreview(url);
     return () => URL.revokeObjectURL(url);
@@ -284,8 +324,16 @@ function AdminPage() {
   }
 
   async function loadProjects() {
+    const storedProjects = readStoredPortfolioProjects();
+    if (storedProjects !== null) {
+      setProjects(storedProjects);
+      return;
+    }
+
     const { data } = await supabase.from("projects").select("*").order("display_order");
-    setProjects((data as Project[]) ?? []);
+    const initialProjects = convertSupabaseProjects(data ?? []);
+    saveStoredPortfolioProjects(initialProjects);
+    setProjects(initialProjects);
   }
 
   async function loadContactInfo() {
@@ -310,7 +358,10 @@ function AdminPage() {
   }
 
   async function loadCertificates() {
-    const { data } = await supabase.from("certificates").select("*").order("date_issued", { ascending: false });
+    const { data } = await supabase
+      .from("certificates")
+      .select("*")
+      .order("date_issued", { ascending: false });
     setCerts((data as Certificate[]) ?? []);
   }
 
@@ -322,7 +373,9 @@ function AdminPage() {
     setProfileAsset(p);
     setCvAsset(c);
     if (p) {
-      const { data: signed } = await supabase.storage.from("profile-images").createSignedUrl(p.file_path, 3600);
+      const { data: signed } = await supabase.storage
+        .from("profile-images")
+        .createSignedUrl(p.file_path, 3600);
       setProfileSignedUrl(signed?.signedUrl ?? null);
     }
   }
@@ -333,12 +386,15 @@ function AdminPage() {
     setHomeMsg(null);
     try {
       if (homeContent) {
-        await supabase.from("home_content").update({
-          name: homeName,
-          title: homeTitle,
-          tagline: homeTagline,
-          summary: homeSummary,
-        }).eq("id", homeContent.id);
+        await supabase
+          .from("home_content")
+          .update({
+            name: homeName,
+            title: homeTitle,
+            tagline: homeTagline,
+            summary: homeSummary,
+          })
+          .eq("id", homeContent.id);
       } else {
         await supabase.from("home_content").insert({
           name: homeName,
@@ -362,14 +418,17 @@ function AdminPage() {
     setAboutMsg(null);
     try {
       if (aboutContent) {
-        await supabase.from("about_content").update({
-          personal_background: aboutPersonal,
-          professional_background: aboutProfessional,
-          vision: aboutVision,
-          mission: aboutMission,
-          career_goals: aboutGoals,
-          interests: aboutInterests,
-        }).eq("id", aboutContent.id);
+        await supabase
+          .from("about_content")
+          .update({
+            personal_background: aboutPersonal,
+            professional_background: aboutProfessional,
+            vision: aboutVision,
+            mission: aboutMission,
+            career_goals: aboutGoals,
+            interests: aboutInterests,
+          })
+          .eq("id", aboutContent.id);
       } else {
         await supabase.from("about_content").insert({
           personal_background: aboutPersonal,
@@ -397,18 +456,22 @@ function AdminPage() {
     try {
       if (editingEduId) {
         // Update existing
-        await supabase.from("education").update({
-          institution: eduInstitution,
-          field_of_study: eduField,
-          degree: eduDegree,
-          start_date: eduStart || null,
-          end_date: eduEnd || null,
-          description: eduDesc || null,
-        }).eq("id", editingEduId);
+        await supabase
+          .from("education")
+          .update({
+            institution: eduInstitution,
+            field_of_study: eduField,
+            degree: eduDegree,
+            start_date: eduStart || null,
+            end_date: eduEnd || null,
+            description: eduDesc || null,
+          })
+          .eq("id", editingEduId);
         setEduMsg("Education updated!");
       } else {
         // Add new
-        const order = education.length > 0 ? Math.max(...education.map(e => e.display_order)) + 1 : 0;
+        const order =
+          education.length > 0 ? Math.max(...education.map((e) => e.display_order)) + 1 : 0;
         await supabase.from("education").insert({
           institution: eduInstitution,
           field_of_study: eduField,
@@ -466,17 +529,21 @@ function AdminPage() {
     try {
       if (editingExpId) {
         // Update existing
-        await supabase.from("experience").update({
-          title: expTitle,
-          company: expCompany,
-          start_date: expStart,
-          end_date: expEnd || null,
-          description: expDesc,
-        }).eq("id", editingExpId);
+        await supabase
+          .from("experience")
+          .update({
+            title: expTitle,
+            company: expCompany,
+            start_date: expStart,
+            end_date: expEnd || null,
+            description: expDesc,
+          })
+          .eq("id", editingExpId);
         setExpMsg("Experience updated!");
       } else {
         // Add new
-        const order = experience.length > 0 ? Math.max(...experience.map(e => e.display_order)) + 1 : 0;
+        const order =
+          experience.length > 0 ? Math.max(...experience.map((e) => e.display_order)) + 1 : 0;
         await supabase.from("experience").insert({
           title: expTitle,
           company: expCompany,
@@ -529,52 +596,64 @@ function AdminPage() {
     setProjLoading(true);
     setProjMsg(null);
     try {
-      let imagePath = null;
-      let imageUrl = null;
+      const title = projTitle.trim();
+      const description = projDesc.trim();
+      const projectLink = projLink.trim();
 
-      if (projFile) {
-        const ext = projFile.name.split(".").pop() || "jpg";
-        imagePath = `projects/${crypto.randomUUID()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from("project-images").upload(imagePath, projFile);
-        if (upErr) throw upErr;
-        const { data: urlData } = supabase.storage.from("project-images").getPublicUrl(imagePath);
-        imageUrl = urlData.publicUrl;
+      if (!title || !description) {
+        setProjMsg("Error: Missing required fields");
+        return;
       }
 
-      if (editingProjId) {
-        // Update existing - if new image, delete old one first
-        const existingProj = projects.find(p => p.id === editingProjId);
-        if (projFile && existingProj?.image_path) {
-          await supabase.storage.from("project-images").remove([existingProj.image_path]);
+      if (projectLink) {
+        try {
+          new URL(projectLink);
+        } catch {
+          setProjMsg("Error: Project link must be a valid URL");
+          return;
         }
-        
-        await supabase.from("projects").update({
-          title: projTitle,
-          description: projDesc,
-          technologies: projTech || null,
-          link: projLink || null,
-          image_path: imagePath || existingProj?.image_path || null,
-          image_url: imageUrl || existingProj?.image_url || null,
-        }).eq("id", editingProjId);
-        setProjMsg("Project updated!");
-      } else {
-        // Add new
-        const order = projects.length > 0 ? Math.max(...projects.map(p => p.display_order)) + 1 : 0;
-        await supabase.from("projects").insert({
-          title: projTitle,
-          description: projDesc,
-          technologies: projTech || null,
-          link: projLink || null,
-          image_path: imagePath,
-          image_url: imageUrl,
-          display_order: order,
-        });
-        setProjMsg("Project added!");
       }
+
+      if (projFile && !PROJECT_IMAGE_ACCEPTED.includes(projFile.type)) {
+        setProjMsg("Error: Invalid image upload");
+        return;
+      }
+
+      const existingProj = editingProjId
+        ? projects.find((project) => project.id === editingProjId)
+        : null;
+      const imageUrl = projFile
+        ? await readProjectImageFile(projFile)
+        : existingProj?.imageUrl || "";
+      const nextProject: Project = {
+        id: editingProjId ?? crypto.randomUUID(),
+        title,
+        description,
+        technologies: parseProjectTechnologies(projTech),
+        projectLink,
+        imageUrl,
+        createdAt: existingProj?.createdAt ?? new Date().toISOString(),
+      };
+
+      let nextProjects: Project[];
+      if (editingProjId) {
+        if (!existingProj) {
+          setProjMsg("Error: Failed save operation");
+          return;
+        }
+        nextProjects = projects.map((project) =>
+          project.id === editingProjId ? nextProject : project,
+        );
+      } else {
+        nextProjects = [nextProject, ...projects];
+      }
+
+      saveStoredPortfolioProjects(nextProjects);
+      setProjects(nextProjects);
       clearProjForm();
-      await loadProjects();
+      setProjMsg(editingProjId ? "Project updated successfully" : "Project added successfully");
     } catch (err) {
-      setProjMsg("Error: " + (err instanceof Error ? err.message : "Unknown"));
+      setProjMsg("Error: " + (err instanceof Error ? err.message : "Failed save operation"));
     } finally {
       setProjLoading(false);
     }
@@ -584,10 +663,11 @@ function AdminPage() {
     setEditingProjId(proj.id);
     setProjTitle(proj.title);
     setProjDesc(proj.description);
-    setProjTech(proj.technologies || "");
-    setProjLink(proj.link || "");
+    setProjTech(proj.technologies.join(", "));
+    setProjLink(proj.projectLink);
     setProjFile(null);
     setProjMsg(null);
+    setProjFileInputKey((key) => key + 1);
   }
 
   function clearProjForm() {
@@ -598,17 +678,16 @@ function AdminPage() {
     setProjLink("");
     setProjFile(null);
     setProjMsg(null);
+    setProjFileInputKey((key) => key + 1);
   }
 
-  async function deleteProject(id: string) {
+  function deleteProject(id: string) {
     if (!confirm("Delete this project?")) return;
-    const proj = projects.find(p => p.id === id);
-    if (proj?.image_path) {
-      await supabase.storage.from("project-images").remove([proj.image_path]);
-    }
-    await supabase.from("projects").delete().eq("id", id);
+    const nextProjects = projects.filter((project) => project.id !== id);
+    saveStoredPortfolioProjects(nextProjects);
+    setProjects(nextProjects);
     if (editingProjId === id) clearProjForm();
-    await loadProjects();
+    setProjMsg("Project deleted successfully");
   }
 
   // CONTACT INFO
@@ -617,12 +696,15 @@ function AdminPage() {
     setContactMsg(null);
     try {
       if (contactInfo) {
-        await supabase.from("contact_info").update({
-          email: contactEmail,
-          phone: contactPhone || null,
-          linkedin: contactLinkedin || null,
-          github: contactGithub || null,
-        }).eq("id", contactInfo.id);
+        await supabase
+          .from("contact_info")
+          .update({
+            email: contactEmail,
+            phone: contactPhone || null,
+            linkedin: contactLinkedin || null,
+            github: contactGithub || null,
+          })
+          .eq("id", contactInfo.id);
       } else {
         await supabase.from("contact_info").insert({
           email: contactEmail,
@@ -645,9 +727,12 @@ function AdminPage() {
     setFooterMsg(null);
     try {
       if (footerContent) {
-        await supabase.from("footer_content").update({
-          copyright_text: footerCopyright,
-        }).eq("id", footerContent.id);
+        await supabase
+          .from("footer_content")
+          .update({
+            copyright_text: footerCopyright,
+          })
+          .eq("id", footerContent.id);
       } else {
         await supabase.from("footer_content").insert({
           copyright_text: footerCopyright,
@@ -667,15 +752,25 @@ function AdminPage() {
     e.preventDefault();
     setCertError(null);
     setCertMessage(null);
-    if (!certFile) { setCertError("Please choose a file."); return; }
+    if (!certFile) {
+      setCertError("Please choose a file.");
+      return;
+    }
+    if (!isAcceptedCertificateFile(certFile)) {
+      setCertError("Please upload a PDF, PNG, JPG, JPEG, or WEBP certificate.");
+      return;
+    }
     setCertUploading(true);
     try {
-      const ext = certFile.name.split(".").pop() || "bin";
-      const path = `${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("certificates").upload(path, certFile);
+      const path = getSafeFileName(certFile.name);
+      const { error: upErr } = await supabase.storage.from("certificates").upload(path, certFile, {
+        cacheControl: "31536000",
+        contentType: certFile.type,
+        upsert: false,
+      });
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from("certificates").getPublicUrl(path);
-      await supabase.from("certificates").insert({
+      const { error: insertErr } = await supabase.from("certificates").insert({
         title: certTitle,
         institution: certInstitution,
         date_issued: certDateIssued,
@@ -684,12 +779,14 @@ function AdminPage() {
         file_path: path,
         file_type: certFile.type,
       });
+      if (insertErr) throw insertErr;
       setCertMessage("Certificate uploaded!");
       setCertTitle("");
       setCertInstitution("");
       setCertDateIssued("");
       setCertDescription("");
       setCertFile(null);
+      setCertFileInputKey((key) => key + 1);
       await loadCertificates();
     } catch (err) {
       setCertError(err instanceof Error ? err.message : "Upload failed");
@@ -710,7 +807,10 @@ function AdminPage() {
     e.preventDefault();
     setProfileErr(null);
     setProfileMsg(null);
-    if (!profileFile) { setProfileErr("Please choose an image."); return; }
+    if (!profileFile) {
+      setProfileErr("Please choose an image.");
+      return;
+    }
     setProfileUploading(true);
     try {
       if (profileAsset) {
@@ -718,7 +818,9 @@ function AdminPage() {
       }
       const ext = profileFile.name.split(".").pop() || "jpg";
       const path = `${crypto.randomUUID()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("profile-images").upload(path, profileFile);
+      const { error: upErr } = await supabase.storage
+        .from("profile-images")
+        .upload(path, profileFile);
       if (upErr) throw upErr;
       const { data: urlData } = supabase.storage.from("profile-images").getPublicUrl(path);
       await supabase.from("site_assets").upsert({
@@ -742,7 +844,10 @@ function AdminPage() {
     e.preventDefault();
     setCvErr(null);
     setCvMsg(null);
-    if (!cvFile) { setCvErr("Please choose a PDF."); return; }
+    if (!cvFile) {
+      setCvErr("Please choose a PDF.");
+      return;
+    }
     setCvUploading(true);
     try {
       if (cvAsset) {
@@ -823,7 +928,10 @@ function AdminPage() {
           {/* FILES TAB */}
           <TabsContent value="files" className="space-y-6">
             <div className="grid gap-6 lg:grid-cols-2">
-              <form onSubmit={uploadProfile} className="space-y-4 rounded-xl border border-border bg-card p-6">
+              <form
+                onSubmit={uploadProfile}
+                className="space-y-4 rounded-xl border border-border bg-card p-6"
+              >
                 <div className="flex items-center gap-2">
                   <UserCircle className="h-5 w-5 text-primary" />
                   <h2 className="text-lg font-semibold">Profile Picture</h2>
@@ -832,51 +940,80 @@ function AdminPage() {
                   {profilePreview ? (
                     <img src={profilePreview} alt="New" className="h-full w-full object-cover" />
                   ) : profileSignedUrl ? (
-                    <img src={profileSignedUrl} alt="Current" className="h-full w-full object-cover" />
+                    <img
+                      src={profileSignedUrl}
+                      alt="Current"
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">No image</div>
+                    <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
+                      No image
+                    </div>
                   )}
                 </div>
                 <div>
                   <Label htmlFor="profile-file">Upload image (JPG, PNG, WEBP · max 5MB)</Label>
-                  <Input id="profile-file" type="file" accept={PROJECT_IMAGE_ACCEPTED.join(",")} onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f && !PROFILE_ACCEPTED.includes(f.type)) {
-                      setProfileErr("Only JPG, PNG, or WEBP accepted.");
-                      return;
-                    }
-                    setProfileFile(f || null);
-                  }} className="mt-1.5" />
+                  <Input
+                    id="profile-file"
+                    type="file"
+                    accept={PROJECT_IMAGE_ACCEPTED.join(",")}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f && !PROFILE_ACCEPTED.includes(f.type)) {
+                        setProfileErr("Only JPG, PNG, or WEBP accepted.");
+                        return;
+                      }
+                      setProfileFile(f || null);
+                    }}
+                    className="mt-1.5"
+                  />
                 </div>
                 {profileErr && <p className="text-sm text-destructive">{profileErr}</p>}
                 {profileMsg && <p className="text-sm text-primary">{profileMsg}</p>}
-                <Button type="submit" disabled={profileUploading || !profileFile} className="w-full">
+                <Button
+                  type="submit"
+                  disabled={profileUploading || !profileFile}
+                  className="w-full"
+                >
                   <Upload className="h-4 w-4" /> {profileUploading ? "Uploading…" : "Save Profile"}
                 </Button>
               </form>
 
-              <form onSubmit={uploadCv} className="space-y-4 rounded-xl border border-border bg-card p-6">
+              <form
+                onSubmit={uploadCv}
+                className="space-y-4 rounded-xl border border-border bg-card p-6"
+              >
                 <div className="flex items-center gap-2">
                   <FileDown className="h-5 w-5 text-primary" />
                   <h2 className="text-lg font-semibold">Curriculum Vitae</h2>
                 </div>
                 <div className="rounded-md border border-border bg-surface p-3 text-sm">
                   {cvAsset ? (
-                    <div><span className="text-muted-foreground">Updated: {new Date(cvAsset.updated_at).toLocaleDateString()}</span></div>
+                    <div>
+                      <span className="text-muted-foreground">
+                        Updated: {new Date(cvAsset.updated_at).toLocaleDateString()}
+                      </span>
+                    </div>
                   ) : (
                     <span className="text-muted-foreground">No CV uploaded yet.</span>
                   )}
                 </div>
                 <div>
                   <Label htmlFor="cv-file">Upload PDF (max 10MB)</Label>
-                  <Input id="cv-file" type="file" accept="application/pdf" onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f && f.type !== "application/pdf") {
-                      setCvErr("Only PDF files accepted.");
-                      return;
-                    }
-                    setCvFile(f || null);
-                  }} className="mt-1.5" />
+                  <Input
+                    id="cv-file"
+                    type="file"
+                    accept="application/pdf"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f && f.type !== "application/pdf") {
+                        setCvErr("Only PDF files accepted.");
+                        return;
+                      }
+                      setCvFile(f || null);
+                    }}
+                    className="mt-1.5"
+                  />
                 </div>
                 {cvErr && <p className="text-sm text-destructive">{cvErr}</p>}
                 {cvMsg && <p className="text-sm text-primary">{cvMsg}</p>}
@@ -889,65 +1026,134 @@ function AdminPage() {
 
           {/* HOME TAB */}
           <TabsContent value="home">
-            <form onSubmit={(e) => { e.preventDefault(); saveHomeContent(); }} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveHomeContent();
+              }}
+              className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl"
+            >
               <h2 className="text-lg font-semibold">Home Page Content</h2>
               <div>
                 <Label htmlFor="home-name">Name</Label>
-                <Input id="home-name" value={homeName} onChange={(e) => setHomeName(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="home-name"
+                  value={homeName}
+                  onChange={(e) => setHomeName(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="home-title">Professional Title</Label>
-                <Input id="home-title" value={homeTitle} onChange={(e) => setHomeTitle(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="home-title"
+                  value={homeTitle}
+                  onChange={(e) => setHomeTitle(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="home-tagline">Tagline</Label>
-                <Input id="home-tagline" value={homeTagline} onChange={(e) => setHomeTagline(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="home-tagline"
+                  value={homeTagline}
+                  onChange={(e) => setHomeTagline(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="home-summary">Summary</Label>
-                <Textarea id="home-summary" value={homeSummary} onChange={(e) => setHomeSummary(e.target.value)} className="mt-1.5 min-h-24" />
+                <Textarea
+                  id="home-summary"
+                  value={homeSummary}
+                  onChange={(e) => setHomeSummary(e.target.value)}
+                  className="mt-1.5 min-h-24"
+                />
               </div>
               {homeMsg && <p className="text-sm text-primary">{homeMsg}</p>}
-              <Button type="submit" disabled={homeLoading}>Save Home Content</Button>
+              <Button type="submit" disabled={homeLoading}>
+                Save Home Content
+              </Button>
             </form>
           </TabsContent>
 
           {/* ABOUT TAB */}
           <TabsContent value="about">
-            <form onSubmit={(e) => { e.preventDefault(); saveAboutContent(); }} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveAboutContent();
+              }}
+              className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl"
+            >
               <h2 className="text-lg font-semibold">About Page Content</h2>
               <div>
                 <Label htmlFor="about-personal">Personal Background</Label>
-                <Textarea id="about-personal" value={aboutPersonal} onChange={(e) => setAboutPersonal(e.target.value)} className="mt-1.5 min-h-24" />
+                <Textarea
+                  id="about-personal"
+                  value={aboutPersonal}
+                  onChange={(e) => setAboutPersonal(e.target.value)}
+                  className="mt-1.5 min-h-24"
+                />
               </div>
               <div>
                 <Label htmlFor="about-professional">Professional Background</Label>
-                <Textarea id="about-professional" value={aboutProfessional} onChange={(e) => setAboutProfessional(e.target.value)} className="mt-1.5 min-h-24" />
+                <Textarea
+                  id="about-professional"
+                  value={aboutProfessional}
+                  onChange={(e) => setAboutProfessional(e.target.value)}
+                  className="mt-1.5 min-h-24"
+                />
               </div>
               <div>
                 <Label htmlFor="about-vision">Vision</Label>
-                <Textarea id="about-vision" value={aboutVision} onChange={(e) => setAboutVision(e.target.value)} className="mt-1.5 min-h-20" />
+                <Textarea
+                  id="about-vision"
+                  value={aboutVision}
+                  onChange={(e) => setAboutVision(e.target.value)}
+                  className="mt-1.5 min-h-20"
+                />
               </div>
               <div>
                 <Label htmlFor="about-mission">Mission</Label>
-                <Textarea id="about-mission" value={aboutMission} onChange={(e) => setAboutMission(e.target.value)} className="mt-1.5 min-h-20" />
+                <Textarea
+                  id="about-mission"
+                  value={aboutMission}
+                  onChange={(e) => setAboutMission(e.target.value)}
+                  className="mt-1.5 min-h-20"
+                />
               </div>
               <div>
                 <Label htmlFor="about-goals">Career Goals</Label>
-                <Textarea id="about-goals" value={aboutGoals} onChange={(e) => setAboutGoals(e.target.value)} className="mt-1.5 min-h-20" />
+                <Textarea
+                  id="about-goals"
+                  value={aboutGoals}
+                  onChange={(e) => setAboutGoals(e.target.value)}
+                  className="mt-1.5 min-h-20"
+                />
               </div>
               <div>
                 <Label htmlFor="about-interests">Interests</Label>
-                <Textarea id="about-interests" value={aboutInterests} onChange={(e) => setAboutInterests(e.target.value)} className="mt-1.5 min-h-20" />
+                <Textarea
+                  id="about-interests"
+                  value={aboutInterests}
+                  onChange={(e) => setAboutInterests(e.target.value)}
+                  className="mt-1.5 min-h-20"
+                />
               </div>
               {aboutMsg && <p className="text-sm text-primary">{aboutMsg}</p>}
-              <Button type="submit" disabled={aboutLoading}>Save About Content</Button>
+              <Button type="submit" disabled={aboutLoading}>
+                Save About Content
+              </Button>
             </form>
           </TabsContent>
 
           {/* EDUCATION TAB */}
           <TabsContent value="education" className="space-y-6">
-            <form onSubmit={addEducation} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+            <form
+              onSubmit={addEducation}
+              className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl"
+            >
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">
                   {editingEduId ? "Edit Education" : "Add Education"}
@@ -960,29 +1166,64 @@ function AdminPage() {
               </div>
               <div>
                 <Label htmlFor="edu-institution">Institution</Label>
-                <Input id="edu-institution" required value={eduInstitution} onChange={(e) => setEduInstitution(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="edu-institution"
+                  required
+                  value={eduInstitution}
+                  onChange={(e) => setEduInstitution(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="edu-field">Field of Study</Label>
-                <Input id="edu-field" required value={eduField} onChange={(e) => setEduField(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="edu-field"
+                  required
+                  value={eduField}
+                  onChange={(e) => setEduField(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="edu-degree">Degree/Qualification</Label>
-                <Input id="edu-degree" required value={eduDegree} onChange={(e) => setEduDegree(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="edu-degree"
+                  required
+                  value={eduDegree}
+                  onChange={(e) => setEduDegree(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="edu-start">Start Date</Label>
-                  <Input id="edu-start" type="date" value={eduStart} onChange={(e) => setEduStart(e.target.value)} className="mt-1.5" />
+                  <Input
+                    id="edu-start"
+                    type="date"
+                    value={eduStart}
+                    onChange={(e) => setEduStart(e.target.value)}
+                    className="mt-1.5"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="edu-end">End Date (Optional)</Label>
-                  <Input id="edu-end" type="date" value={eduEnd} onChange={(e) => setEduEnd(e.target.value)} className="mt-1.5" />
+                  <Input
+                    id="edu-end"
+                    type="date"
+                    value={eduEnd}
+                    onChange={(e) => setEduEnd(e.target.value)}
+                    className="mt-1.5"
+                  />
                 </div>
               </div>
               <div>
                 <Label htmlFor="edu-desc">Description (Optional)</Label>
-                <Textarea id="edu-desc" value={eduDesc} onChange={(e) => setEduDesc(e.target.value)} className="mt-1.5 min-h-20" />
+                <Textarea
+                  id="edu-desc"
+                  value={eduDesc}
+                  onChange={(e) => setEduDesc(e.target.value)}
+                  className="mt-1.5 min-h-20"
+                />
               </div>
               {eduMsg && <p className="text-sm text-primary">{eduMsg}</p>}
               <div className="flex gap-3">
@@ -1000,9 +1241,14 @@ function AdminPage() {
             <div className="space-y-3">
               <h3 className="font-semibold">Education Records ({education.length})</h3>
               {education.map((edu) => (
-                <div key={edu.id} className={`flex items-start justify-between gap-3 rounded-xl border p-4 ${editingEduId === edu.id ? "border-primary bg-card/50 ring-1 ring-primary" : "border-border bg-card"}`}>
+                <div
+                  key={edu.id}
+                  className={`flex items-start justify-between gap-3 rounded-xl border p-4 ${editingEduId === edu.id ? "border-primary bg-card/50 ring-1 ring-primary" : "border-border bg-card"}`}
+                >
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold">{edu.degree} in {edu.field_of_study}</p>
+                    <p className="font-semibold">
+                      {edu.degree} in {edu.field_of_study}
+                    </p>
                     <p className="text-sm text-muted-foreground">{edu.institution}</p>
                     <p className="text-xs text-muted-foreground">
                       {edu.start_date ? new Date(edu.start_date).toLocaleDateString() : "N/A"}
@@ -1010,10 +1256,20 @@ function AdminPage() {
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={() => loadEducationForEdit(edu)} variant="ghost" size="icon" title="Edit">
+                    <Button
+                      onClick={() => loadEducationForEdit(edu)}
+                      variant="ghost"
+                      size="icon"
+                      title="Edit"
+                    >
                       <Edit2 className="h-4 w-4 text-primary" />
                     </Button>
-                    <Button onClick={() => deleteEducation(edu.id)} variant="ghost" size="icon" title="Delete">
+                    <Button
+                      onClick={() => deleteEducation(edu.id)}
+                      variant="ghost"
+                      size="icon"
+                      title="Delete"
+                    >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -1024,7 +1280,10 @@ function AdminPage() {
 
           {/* EXPERIENCE TAB */}
           <TabsContent value="experience" className="space-y-6">
-            <form onSubmit={addExperience} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+            <form
+              onSubmit={addExperience}
+              className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl"
+            >
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">
                   {editingExpId ? "Edit Experience" : "Add Experience"}
@@ -1037,30 +1296,62 @@ function AdminPage() {
               </div>
               <div>
                 <Label htmlFor="exp-title">Job Title</Label>
-                <Input id="exp-title" required value={expTitle} onChange={(e) => setExpTitle(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="exp-title"
+                  required
+                  value={expTitle}
+                  onChange={(e) => setExpTitle(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="exp-company">Company</Label>
-                <Input id="exp-company" required value={expCompany} onChange={(e) => setExpCompany(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="exp-company"
+                  required
+                  value={expCompany}
+                  onChange={(e) => setExpCompany(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="exp-start">Start Date</Label>
-                  <Input id="exp-start" type="date" required value={expStart} onChange={(e) => setExpStart(e.target.value)} className="mt-1.5" />
+                  <Input
+                    id="exp-start"
+                    type="date"
+                    required
+                    value={expStart}
+                    onChange={(e) => setExpStart(e.target.value)}
+                    className="mt-1.5"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="exp-end">End Date (Optional)</Label>
-                  <Input id="exp-end" type="date" value={expEnd} onChange={(e) => setExpEnd(e.target.value)} className="mt-1.5" />
+                  <Input
+                    id="exp-end"
+                    type="date"
+                    value={expEnd}
+                    onChange={(e) => setExpEnd(e.target.value)}
+                    className="mt-1.5"
+                  />
                 </div>
               </div>
               <div>
                 <Label htmlFor="exp-desc">Description</Label>
-                <Textarea id="exp-desc" required value={expDesc} onChange={(e) => setExpDesc(e.target.value)} className="mt-1.5 min-h-24" />
+                <Textarea
+                  id="exp-desc"
+                  required
+                  value={expDesc}
+                  onChange={(e) => setExpDesc(e.target.value)}
+                  className="mt-1.5 min-h-24"
+                />
               </div>
               {expMsg && <p className="text-sm text-primary">{expMsg}</p>}
               <div className="flex gap-3">
                 <Button type="submit" disabled={expLoading} className="flex-1">
-                  <Plus className="h-4 w-4" /> {editingExpId ? "Update Experience" : "Add Experience"}
+                  <Plus className="h-4 w-4" />{" "}
+                  {editingExpId ? "Update Experience" : "Add Experience"}
                 </Button>
                 {editingExpId && (
                   <Button type="button" onClick={clearExpForm} variant="outline" className="flex-1">
@@ -1073,19 +1364,33 @@ function AdminPage() {
             <div className="space-y-3">
               <h3 className="font-semibold">Experience Records ({experience.length})</h3>
               {experience.map((exp) => (
-                <div key={exp.id} className={`flex items-start justify-between gap-3 rounded-xl border p-4 ${editingExpId === exp.id ? "border-primary bg-card/50 ring-1 ring-primary" : "border-border bg-card"}`}>
+                <div
+                  key={exp.id}
+                  className={`flex items-start justify-between gap-3 rounded-xl border p-4 ${editingExpId === exp.id ? "border-primary bg-card/50 ring-1 ring-primary" : "border-border bg-card"}`}
+                >
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold">{exp.title}</p>
                     <p className="text-sm text-muted-foreground">{exp.company}</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(exp.start_date).toLocaleDateString()} – {exp.end_date ? new Date(exp.end_date).toLocaleDateString() : "Present"}
+                      {new Date(exp.start_date).toLocaleDateString()} –{" "}
+                      {exp.end_date ? new Date(exp.end_date).toLocaleDateString() : "Present"}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={() => loadExperienceForEdit(exp)} variant="ghost" size="icon" title="Edit">
+                    <Button
+                      onClick={() => loadExperienceForEdit(exp)}
+                      variant="ghost"
+                      size="icon"
+                      title="Edit"
+                    >
                       <Edit2 className="h-4 w-4 text-primary" />
                     </Button>
-                    <Button onClick={() => deleteExperience(exp.id)} variant="ghost" size="icon" title="Delete">
+                    <Button
+                      onClick={() => deleteExperience(exp.id)}
+                      variant="ghost"
+                      size="icon"
+                      title="Delete"
+                    >
                       <Trash2 className="h-4 w-4 text-destructive" />
                     </Button>
                   </div>
@@ -1096,7 +1401,10 @@ function AdminPage() {
 
           {/* PROJECTS TAB */}
           <TabsContent value="projects" className="space-y-6">
-            <form onSubmit={addProject} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+            <form
+              onSubmit={addProject}
+              className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl"
+            >
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">
                   {editingProjId ? "Edit Project" : "Add Project"}
@@ -1109,152 +1417,364 @@ function AdminPage() {
               </div>
               <div>
                 <Label htmlFor="proj-title">Project Title</Label>
-                <Input id="proj-title" required value={projTitle} onChange={(e) => setProjTitle(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="proj-title"
+                  required
+                  value={projTitle}
+                  onChange={(e) => setProjTitle(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="proj-desc">Description</Label>
-                <Textarea id="proj-desc" required value={projDesc} onChange={(e) => setProjDesc(e.target.value)} className="mt-1.5 min-h-24" />
+                <Textarea
+                  id="proj-desc"
+                  required
+                  value={projDesc}
+                  onChange={(e) => setProjDesc(e.target.value)}
+                  className="mt-1.5 min-h-24"
+                />
               </div>
               <div>
                 <Label htmlFor="proj-tech">Technologies (comma-separated, optional)</Label>
-                <Input id="proj-tech" value={projTech} onChange={(e) => setProjTech(e.target.value)} className="mt-1.5" placeholder="React, TypeScript, Tailwind" />
+                <Input
+                  id="proj-tech"
+                  value={projTech}
+                  onChange={(e) => setProjTech(e.target.value)}
+                  className="mt-1.5"
+                  placeholder="React, TypeScript, Tailwind"
+                />
               </div>
               <div>
                 <Label htmlFor="proj-link">Project Link (optional)</Label>
-                <Input id="proj-link" type="url" value={projLink} onChange={(e) => setProjLink(e.target.value)} className="mt-1.5" placeholder="https://..." />
+                <Input
+                  id="proj-link"
+                  type="url"
+                  value={projLink}
+                  onChange={(e) => setProjLink(e.target.value)}
+                  className="mt-1.5"
+                  placeholder="https://..."
+                />
               </div>
               <div>
                 <Label htmlFor="proj-image">Project Image (optional)</Label>
-                <Input id="proj-image" type="file" accept={PROJECT_IMAGE_ACCEPTED.join(",")} onChange={(e) => setProjFile(e.target.files?.[0] || null)} className="mt-1.5" />
-                {editingProjId && projects.find(p => p.id === editingProjId)?.image_url && !projFile && (
-                  <p className="mt-2 text-xs text-muted-foreground">Current image exists. Upload new to replace.</p>
-                )}
+                <Input
+                  key={projFileInputKey}
+                  id="proj-image"
+                  type="file"
+                  accept={PROJECT_IMAGE_ACCEPTED.join(",")}
+                  onChange={(e) => setProjFile(e.target.files?.[0] || null)}
+                  className="mt-1.5"
+                />
+                {editingProjId &&
+                  projects.find((p) => p.id === editingProjId)?.imageUrl &&
+                  !projFile && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Current image exists. Upload new to replace.
+                    </p>
+                  )}
               </div>
-              {projMsg && <p className="text-sm text-primary">{projMsg}</p>}
+              {projMsg && (
+                <p
+                  className={`text-sm ${projMsg.startsWith("Error:") ? "text-destructive" : "text-primary"}`}
+                >
+                  {projMsg}
+                </p>
+              )}
               <div className="flex gap-3">
                 <Button type="submit" disabled={projLoading} className="flex-1">
                   <Plus className="h-4 w-4" /> {editingProjId ? "Update Project" : "Add Project"}
                 </Button>
                 {editingProjId && (
-                  <Button type="button" onClick={clearProjForm} variant="outline" className="flex-1">
+                  <Button
+                    type="button"
+                    onClick={clearProjForm}
+                    variant="outline"
+                    className="flex-1"
+                  >
                     Cancel
                   </Button>
                 )}
               </div>
             </form>
 
-            <div className="space-y-3">
-              <h3 className="font-semibold">Projects ({projects.length})</h3>
-              {projects.map((proj) => (
-                <div key={proj.id} className={`flex items-start justify-between gap-3 rounded-xl border p-4 ${editingProjId === proj.id ? "border-primary bg-card/50 ring-1 ring-primary" : "border-border bg-card"}`}>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold">{proj.title}</p>
-                    <p className="text-sm text-muted-foreground truncate">{proj.description}</p>
-                    {proj.technologies && <p className="text-xs text-muted-foreground">{proj.technologies}</p>}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button onClick={() => loadProjectForEdit(proj)} variant="ghost" size="icon" title="Edit">
-                      <Edit2 className="h-4 w-4 text-primary" />
-                    </Button>
-                    <Button onClick={() => deleteProject(proj.id)} variant="ghost" size="icon" title="Delete">
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
+            <div className="space-y-4">
+              <h3 className="font-semibold">Projects List ({projects.length})</h3>
+              {projects.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
+                  No projects saved yet. Add a project above to display it here.
                 </div>
-              ))}
+              ) : (
+                <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {projects.map((proj) => (
+                    <article
+                      key={proj.id}
+                      className={`overflow-hidden rounded-xl border bg-card shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+                        editingProjId === proj.id
+                          ? "border-primary ring-1 ring-primary"
+                          : "border-border"
+                      }`}
+                    >
+                      <ProjectCardMedia imageUrl={proj.imageUrl} title={proj.title} />
+                      <div className="space-y-4 p-5">
+                        <div>
+                          <h4 className="text-base font-semibold">{proj.title}</h4>
+                          <p className="mt-2 line-clamp-4 text-sm leading-6 text-muted-foreground">
+                            {proj.description}
+                          </p>
+                        </div>
+
+                        {proj.technologies.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {proj.technologies.map((technology) => (
+                              <span
+                                key={technology}
+                                className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-accent-foreground"
+                              >
+                                {technology}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+
+                        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+                          {proj.projectLink ? (
+                            <Button asChild size="sm">
+                              <a href={proj.projectLink} target="_blank" rel="noreferrer">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                View Project
+                              </a>
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button"
+                            onClick={() => loadProjectForEdit(proj)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={() => deleteProject(proj.id)}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            Delete
+                          </Button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
           </TabsContent>
 
           {/* CONTACT TAB */}
           <TabsContent value="contact">
-            <form onSubmit={(e) => { e.preventDefault(); saveContactInfo(); }} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveContactInfo();
+              }}
+              className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl"
+            >
               <h2 className="text-lg font-semibold">Contact Information</h2>
               <div>
                 <Label htmlFor="contact-email">Email</Label>
-                <Input id="contact-email" type="email" required value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="contact-email"
+                  type="email"
+                  required
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="contact-phone">Phone (optional)</Label>
-                <Input id="contact-phone" type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="contact-phone"
+                  type="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="contact-linkedin">LinkedIn URL (optional)</Label>
-                <Input id="contact-linkedin" type="url" value={contactLinkedin} onChange={(e) => setContactLinkedin(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="contact-linkedin"
+                  type="url"
+                  value={contactLinkedin}
+                  onChange={(e) => setContactLinkedin(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="contact-github">GitHub URL (optional)</Label>
-                <Input id="contact-github" type="url" value={contactGithub} onChange={(e) => setContactGithub(e.target.value)} className="mt-1.5" />
+                <Input
+                  id="contact-github"
+                  type="url"
+                  value={contactGithub}
+                  onChange={(e) => setContactGithub(e.target.value)}
+                  className="mt-1.5"
+                />
               </div>
               {contactMsg && <p className="text-sm text-primary">{contactMsg}</p>}
-              <Button type="submit" disabled={contactLoading}>Save Contact Info</Button>
+              <Button type="submit" disabled={contactLoading}>
+                Save Contact Info
+              </Button>
             </form>
           </TabsContent>
 
           {/* FOOTER TAB */}
           <TabsContent value="footer">
-            <form onSubmit={(e) => { e.preventDefault(); saveFooterContent(); }} className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveFooterContent();
+              }}
+              className="space-y-4 rounded-xl border border-border bg-card p-6 max-w-2xl"
+            >
               <h2 className="text-lg font-semibold">Footer Content</h2>
               <div>
                 <Label htmlFor="footer-copyright">Copyright Text</Label>
-                <Textarea id="footer-copyright" value={footerCopyright} onChange={(e) => setFooterCopyright(e.target.value)} className="mt-1.5 min-h-24" />
+                <Textarea
+                  id="footer-copyright"
+                  value={footerCopyright}
+                  onChange={(e) => setFooterCopyright(e.target.value)}
+                  className="mt-1.5 min-h-24"
+                />
               </div>
               {footerMsg && <p className="text-sm text-primary">{footerMsg}</p>}
-              <Button type="submit" disabled={footerLoading}>Save Footer Content</Button>
+              <Button type="submit" disabled={footerLoading}>
+                Save Footer Content
+              </Button>
             </form>
           </TabsContent>
 
           {/* CERTIFICATES TAB */}
           <TabsContent value="certificates" className="space-y-6">
             <div className="grid gap-8 lg:grid-cols-2">
-              <form onSubmit={uploadCertificate} className="space-y-4 rounded-xl border border-border bg-card p-6">
+              <form
+                onSubmit={uploadCertificate}
+                className="space-y-4 rounded-xl border border-border bg-card p-6"
+              >
                 <h2 className="text-lg font-semibold">Upload Certificate</h2>
                 <div>
                   <Label htmlFor="cert-title">Certificate Title</Label>
-                  <Input id="cert-title" required value={certTitle} onChange={(e) => setCertTitle(e.target.value)} className="mt-1.5" />
+                  <Input
+                    id="cert-title"
+                    required
+                    value={certTitle}
+                    onChange={(e) => setCertTitle(e.target.value)}
+                    className="mt-1.5"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="cert-institution">Institution</Label>
-                  <Input id="cert-institution" required value={certInstitution} onChange={(e) => setCertInstitution(e.target.value)} className="mt-1.5" />
+                  <Input
+                    id="cert-institution"
+                    required
+                    value={certInstitution}
+                    onChange={(e) => setCertInstitution(e.target.value)}
+                    className="mt-1.5"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="cert-date">Date Issued</Label>
-                  <Input id="cert-date" type="date" required value={certDateIssued} onChange={(e) => setCertDateIssued(e.target.value)} className="mt-1.5" />
+                  <Input
+                    id="cert-date"
+                    type="date"
+                    required
+                    value={certDateIssued}
+                    onChange={(e) => setCertDateIssued(e.target.value)}
+                    className="mt-1.5"
+                  />
                 </div>
                 <div>
                   <Label htmlFor="cert-desc">Description (optional)</Label>
-                  <Textarea id="cert-desc" value={certDescription} onChange={(e) => setCertDescription(e.target.value)} className="mt-1.5 min-h-20" />
+                  <Textarea
+                    id="cert-desc"
+                    value={certDescription}
+                    onChange={(e) => setCertDescription(e.target.value)}
+                    className="mt-1.5 min-h-20"
+                  />
                 </div>
                 <div>
-                  <Label htmlFor="cert-file">Certificate File (PDF, JPG, PNG)</Label>
-                  <Input id="cert-file" type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setCertFile(e.target.files?.[0] || null)} className="mt-1.5" />
+                  <Label htmlFor="cert-file">Certificate File (PDF, PNG, JPG, JPEG, WEBP)</Label>
+                  <Input
+                    key={certFileInputKey}
+                    id="cert-file"
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"
+                    onChange={(e) => setCertFile(e.target.files?.[0] || null)}
+                    className="mt-1.5"
+                  />
                 </div>
                 {certPreviewUrl && certFile && (
                   <div className="rounded-md border border-border bg-surface p-3">
                     <p className="mb-2 text-xs font-medium text-muted-foreground">PREVIEW</p>
                     {certFile.type === "application/pdf" ? (
-                      <iframe src={certPreviewUrl} title="Preview" className="h-64 w-full rounded" />
+                      <iframe
+                        src={certPreviewUrl}
+                        title="Preview"
+                        className="h-64 w-full rounded"
+                      />
                     ) : (
-                      <img src={certPreviewUrl} alt="Preview" className="max-h-64 rounded object-contain" />
+                      <img
+                        src={certPreviewUrl}
+                        alt="Preview"
+                        className="max-h-64 rounded object-contain"
+                      />
                     )}
                   </div>
                 )}
                 {certError && <p className="text-sm text-destructive">{certError}</p>}
                 {certMessage && <p className="text-sm text-primary">{certMessage}</p>}
                 <Button type="submit" disabled={certUploading} className="w-full">
-                  <Upload className="h-4 w-4" /> {certUploading ? "Uploading…" : "Upload Certificate"}
+                  <Upload className="h-4 w-4" />{" "}
+                  {certUploading ? "Uploading…" : "Upload Certificate"}
                 </Button>
               </form>
 
               <div className="space-y-3">
                 <h2 className="text-lg font-semibold">Certificates ({certs.length})</h2>
                 {certs.map((c) => (
-                  <div key={c.id} className="flex items-start gap-3 rounded-xl border border-border bg-card p-4">
+                  <div
+                    key={c.id}
+                    className="flex items-start gap-3 rounded-xl border border-border bg-card p-4"
+                  >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-primary">
-                      {c.file_type === "application/pdf" ? <FileText className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}
+                      {c.file_type === "application/pdf" ? (
+                        <FileText className="h-5 w-5" />
+                      ) : (
+                        <ImageIcon className="h-5 w-5" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="truncate font-semibold">{c.title}</p>
-                      <p className="text-xs text-muted-foreground">{c.institution} · {new Date(c.date_issued).toLocaleDateString()}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.institution} · {new Date(c.date_issued).toLocaleDateString()}
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button asChild variant="outline" size="sm">
+                          <a href={c.file_url} target="_blank" rel="noreferrer">
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            View
+                          </a>
+                        </Button>
+                        <Button asChild variant="outline" size="sm">
+                          <a href={c.file_url} download>
+                            <FileDown className="h-3.5 w-3.5" />
+                            Download
+                          </a>
+                        </Button>
+                      </div>
                     </div>
                     <Button onClick={() => deleteCertificate(c)} variant="ghost" size="icon">
                       <Trash2 className="h-4 w-4 text-destructive" />
