@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      about_content: {
+        Row: {
+          career_goals: string
+          created_at: string
+          id: string
+          interests: string
+          mission: string
+          personal_background: string
+          professional_background: string
+          updated_at: string
+          vision: string
+        }
+        Insert: {
+          career_goals: string
+          created_at?: string
+          id?: string
+          interests: string
+          mission: string
+          personal_background: string
+          professional_background: string
+          updated_at?: string
+          vision: string
+        }
+        Update: {
+          career_goals?: string
+          created_at?: string
+          id?: string
+          interests?: string
+          mission?: string
+          personal_background?: string
+          professional_background?: string
+          updated_at?: string
+          vision?: string
+        }
+        Relationships: []
+      }
       certificates: {
         Row: {
           created_at: string
@@ -48,6 +84,198 @@ export type Database = {
           file_url?: string
           id?: string
           institution?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      contact_info: {
+        Row: {
+          created_at: string
+          email: string
+          github: string | null
+          id: string
+          linkedin: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          github?: string | null
+          id?: string
+          linkedin?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          github?: string | null
+          id?: string
+          linkedin?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      education: {
+        Row: {
+          created_at: string
+          degree: string
+          description: string | null
+          display_order: number
+          end_date: string | null
+          field_of_study: string
+          id: string
+          institution: string
+          start_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          degree: string
+          description?: string | null
+          display_order?: number
+          end_date?: string | null
+          field_of_study: string
+          id?: string
+          institution: string
+          start_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          degree?: string
+          description?: string | null
+          display_order?: number
+          end_date?: string | null
+          field_of_study?: string
+          id?: string
+          institution?: string
+          start_date?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      experience: {
+        Row: {
+          company: string
+          created_at: string
+          description: string
+          display_order: number
+          end_date: string | null
+          id: string
+          start_date: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company: string
+          created_at?: string
+          description: string
+          display_order?: number
+          end_date?: string | null
+          id?: string
+          start_date: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company?: string
+          created_at?: string
+          description?: string
+          display_order?: number
+          end_date?: string | null
+          id?: string
+          start_date?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      footer_content: {
+        Row: {
+          copyright_text: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          copyright_text: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          copyright_text?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      home_content: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          summary: string
+          tagline: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          summary: string
+          tagline: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          summary?: string
+          tagline?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string
+          description: string
+          display_order: number
+          id: string
+          image_url: string | null
+          link: string | null
+          technologies: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          link?: string | null
+          technologies?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          display_order?: number
+          id?: string
+          image_url?: string | null
+          link?: string | null
+          technologies?: string | null
           title?: string
           updated_at?: string
         }

@@ -38,7 +38,7 @@ function AuthPage() {
     try {
       if (mode === "reset") {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          options: { emailRedirectTo: `${window.location.origin}/auth` },
+          redirectTo: `${window.location.origin}/auth`,
         });
         if (error) throw error;
         setMessage("Password reset instructions have been sent to your email.");
