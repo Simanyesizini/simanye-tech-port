@@ -374,16 +374,9 @@ function CertificationsPage() {
                 <div className="flex gap-2">
                   {viewingUrl && (
                     <>
-                      <Button asChild size="sm" variant="outline">
-                        <a
-                          href={signedUrls[`${viewing.id}:download`] ?? viewingUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          download
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          Download Certificate
-                        </a>
+                      <Button type="button" size="sm" variant="outline" onClick={downloadCurrent}>
+                        <Download className="h-3.5 w-3.5" />
+                        Download Certificate
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <a href={viewingUrl} target="_blank" rel="noreferrer">Open in new tab</a>
