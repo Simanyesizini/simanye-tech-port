@@ -297,9 +297,10 @@ function CertificationsPage() {
                       <span>{new Date(cert.date_issued).toLocaleDateString(undefined, { year: "numeric" })}</span>
                       <span className="rounded-full bg-accent/30 px-2 py-1">{cert.file_type === "application/pdf" ? "PDF" : "Image"}</span>
                     </div>
-                    <Button type="button" size="sm" className="w-full" onClick={() => { setViewing(cert); setIsOpen(true); }}>
+                    <Button type="button" size="sm" className="w-full" onClick={(e) => { e.stopPropagation(); openCertificate(cert); }}>
                       View Certificate
                     </Button>
+
                   </div>
                 </article>
               ))}
