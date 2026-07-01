@@ -336,29 +336,34 @@ function CertificationsPage() {
                 >
                   <X className="h-5 w-5" />
                 </button>
-                {viewing.file_url || viewing.file_path ? (
-                  viewing.file_type === "application/pdf" ? (
-                    <iframe src={getCertificateUrl(viewing)} title={viewing.title} className="h-full w-full" />
-                  ) : (
-                    <img src={getCertificateUrl(viewing)} alt={viewing.title} className="h-full w-full object-contain" />
-                  )
+                {viewingError ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{viewingError}</div>
+                ) : !viewingUrl ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading certificate…</div>
+                ) : viewing.file_type === "application/pdf" ? (
+                  <iframe src={viewingUrl} title={viewing.title} className="h-full w-full" />
                 ) : (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Certificate file unavailable.</div>
+                  <img src={viewingUrl} alt={viewing.title} className="h-full w-full object-contain" />
                 )}
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4">
                 <div className="text-sm text-muted-foreground">Full-screen support available via browser controls.</div>
                 <div className="flex gap-2">
-                  {(viewing.file_url || viewing.file_path) && (
+                  {viewingUrl && (
                     <>
                       <Button asChild size="sm" variant="outline">
-                        <a href={getCertificateUrl(viewing)} target="_blank" rel="noreferrer" download>
+                        <a
+                          href={signedUrls[`${viewing.id}:download`] ?? viewingUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          download
+                        >
                           <Download className="h-3.5 w-3.5" />
-                          Download
+                          Download Certificate
                         </a>
                       </Button>
                       <Button asChild size="sm" variant="outline">
-                        <a href={getCertificateUrl(viewing)} target="_blank" rel="noreferrer">Open in new tab</a>
+                        <a href={viewingUrl} target="_blank" rel="noreferrer">Open in new tab</a>
                       </Button>
                     </>
                   )}
@@ -367,6 +372,7 @@ function CertificationsPage() {
                   </DialogClose>
                 </div>
               </div>
+
             </div>
           )}
         </DialogContent>
