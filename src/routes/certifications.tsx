@@ -112,34 +112,57 @@ function CertificationsPage() {
     return signedUrls[cert.id] ?? "";
   }
 
+  function buildDownloadFilename(cert: Certificate): string {
+    const ext = (cert.file_path.split(".").pop() || (cert.file_type === "application/pdf" ? "pdf" : "bin")).toLowerCase();
+    const safe = cert.title.replace(/[^a-z0-9-_ ]/gi, "").trim().replace(/\s+/g, "_") || "certificate";
+    return `${safe}.${ext}`;
+  }
+
   async function openCertificate(cert: Certificate) {
+    console.log("[cert] open", cert.id, cert.file_path);
     setViewing(cert);
     setIsOpen(true);
     setViewingError(null);
     setViewingUrl(null);
     if (!cert.file_path) {
+      console.error("[cert] no file_path for", cert.id);
       setViewingError("Certificate file not available.");
       return;
     }
-    // Always create a fresh signed URL for the modal (long-lived, for download too)
-    const { data, error } = await supabase.storage
-      .from("certificates")
-      .createSignedUrl(cert.file_path, 3600, {
-        download: cert.file_path.split("/").pop() ?? cert.title,
-      });
-    // Also fetch a viewing URL without forced download disposition
     const { data: viewData, error: viewErr } = await supabase.storage
       .from("certificates")
       .createSignedUrl(cert.file_path, 3600);
-    if (error || viewErr || !viewData?.signedUrl) {
-      console.error("Failed to create signed URL", error ?? viewErr);
+    if (viewErr || !viewData?.signedUrl) {
+      console.error("[cert] signed url failed", viewErr);
       setViewingError("Certificate file not available.");
       return;
     }
+    console.log("[cert] view url ready");
     setViewingUrl(viewData.signedUrl);
-    // Store download URL on the cert temporarily via signedUrls map
-    if (data?.signedUrl) {
-      setSignedUrls((prev) => ({ ...prev, [`${cert.id}:download`]: data.signedUrl }));
+  }
+
+  async function downloadCurrent() {
+    if (!viewing || !viewingUrl) return;
+    const filename = buildDownloadFilename(viewing);
+    try {
+      const res = await fetch(viewingUrl);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch (err) {
+      console.error("[cert] download failed", err);
+      // Fallback: navigate to a download-scoped signed URL
+      const { data } = await supabase.storage
+        .from("certificates")
+        .createSignedUrl(viewing.file_path, 3600, { download: filename });
+      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
     }
   }
 
