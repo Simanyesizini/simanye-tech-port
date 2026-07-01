@@ -30,10 +30,13 @@ type Certificate = {
 
 function CertificationsPage() {
   const [certs, setCerts] = useState<Certificate[]>([]);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewing, setViewing] = useState<Certificate | null>(null);
+  const [viewingUrl, setViewingUrl] = useState<string | null>(null);
+  const [viewingError, setViewingError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const autoplayRef = useRef<number | null>(null);
@@ -42,14 +45,30 @@ function CertificationsPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("certificates")
         .select("*")
         .order("date_issued", { ascending: false });
-      setCerts((data as Certificate[]) ?? []);
+      if (error) console.error("Failed to load certificates", error);
+      const list = (data as Certificate[]) ?? [];
+      setCerts(list);
       setLoading(false);
+
+      // Pre-generate signed URLs for image previews in cards
+      const entries = await Promise.all(
+        list.map(async (c) => {
+          if (!c.file_path) return [c.id, ""] as const;
+          const { data: signed, error: sErr } = await supabase.storage
+            .from("certificates")
+            .createSignedUrl(c.file_path, 3600);
+          if (sErr) console.error("Signed URL error for", c.id, sErr);
+          return [c.id, signed?.signedUrl ?? ""] as const;
+        }),
+      );
+      setSignedUrls(Object.fromEntries(entries));
     })();
   }, []);
+
 
   useEffect(() => {
     if (!isOpen) return;
