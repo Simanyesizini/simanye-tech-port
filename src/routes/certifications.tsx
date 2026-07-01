@@ -108,11 +108,50 @@ function CertificationsPage() {
 
   const hasResults = filtered.length > 0;
 
-  function getCertificateUrl(cert: Certificate) {
-    if (cert.file_url) return cert.file_url;
-    const { data } = supabase.storage.from("certificates").getPublicUrl(cert.file_path);
-    return data.publicUrl;
+  function getCertificateUrl(cert: Certificate): string {
+    return signedUrls[cert.id] ?? "";
   }
+
+  async function openCertificate(cert: Certificate) {
+    setViewing(cert);
+    setIsOpen(true);
+    setViewingError(null);
+    setViewingUrl(null);
+    if (!cert.file_path) {
+      setViewingError("Certificate file not available.");
+      return;
+    }
+    // Always create a fresh signed URL for the modal (long-lived, for download too)
+    const { data, error } = await supabase.storage
+      .from("certificates")
+      .createSignedUrl(cert.file_path, 3600, {
+        download: cert.file_path.split("/").pop() ?? cert.title,
+      });
+    // Also fetch a viewing URL without forced download disposition
+    const { data: viewData, error: viewErr } = await supabase.storage
+      .from("certificates")
+      .createSignedUrl(cert.file_path, 3600);
+    if (error || viewErr || !viewData?.signedUrl) {
+      console.error("Failed to create signed URL", error ?? viewErr);
+      setViewingError("Certificate file not available.");
+      return;
+    }
+    setViewingUrl(viewData.signedUrl);
+    // Store download URL on the cert temporarily via signedUrls map
+    if (data?.signedUrl) {
+      setSignedUrls((prev) => ({ ...prev, [`${cert.id}:download`]: data.signedUrl }));
+    }
+  }
+
+  // Prevent background scrolling while modal open
+  useEffect(() => {
+    if (isOpen) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = prev; };
+    }
+  }, [isOpen]);
+
 
   function scrollToIndex(index: number) {
     if (!carouselRef.current) return;
