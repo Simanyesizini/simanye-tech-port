@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
 import { Mail, Phone, Github, Linkedin, Download, Send, CheckCircle2, Loader2 } from "lucide-react";
@@ -48,7 +48,7 @@ function ContactPage() {
   }, []);
 
   const [sending, setSending] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
+  
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
