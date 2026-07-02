@@ -54,11 +54,14 @@ function ContactPage() {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (sending) return;
     const form = e.currentTarget;
     const fd = new FormData(form);
     const parsed = schema.safeParse({
       name: fd.get("name"),
       email: fd.get("email"),
+      phone: fd.get("phone") ?? "",
+      subject: fd.get("subject"),
       message: fd.get("message"),
     });
     if (!parsed.success) {
@@ -70,7 +73,24 @@ function ContactPage() {
     setErrors({});
     setSending(true);
     try {
-      await sendContactMessage({ data: parsed.data });
+      const res = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_ACCESS_KEY,
+          subject: parsed.data.subject,
+          from_name: parsed.data.name,
+          replyto: parsed.data.email,
+          name: parsed.data.name,
+          email: parsed.data.email,
+          phone: parsed.data.phone || "Not provided",
+          message: parsed.data.message,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || `Request failed: ${res.status}`);
+      }
       toast.success("Message sent successfully!", {
         description: "Thank you — I'll be in touch shortly.",
       });
