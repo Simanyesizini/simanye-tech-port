@@ -6,7 +6,7 @@ import { Mail, Phone, Github, Linkedin, Download, Send, CheckCircle2, Loader2 } 
 import { z } from "zod";
 import { toast } from "sonner";
 import { getSignedAssetUrl } from "@/lib/site-assets";
-import { sendContactMessage } from "@/lib/send-contact.functions";
+const WEB3FORMS_ACCESS_KEY = "YOUR_WEB3FORMS_ACCESS_KEY";
 
 type ContactInfo = {
   email: string;
