@@ -1,11 +1,120 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo, useState } from "react";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
-import { BadgeCheck, FileText, Search, X, ChevronLeft, ChevronRight, Download } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog";
+import { Download, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+
+const certificateAssets = import.meta.glob("@/assets/*.{pdf,jpg,jpeg,png}", {
+  eager: true,
+  import: "default",
+}) as Record<string, string>;
+
+type CertificateItem = {
+  title: string;
+  institution: string;
+  date: string | null;
+  assetHint?: string;
+};
+
+type CertificateCategory = {
+  title: string;
+  description?: string;
+  items: CertificateItem[];
+};
+
+const categories: CertificateCategory[] = [
+  {
+    title: "Candidate Professional Development",
+    items: [
+      { title: "Write Professional Emails in English", institution: "Coursera", date: "2024" },
+      { title: "Verbal Communications and Presentation Skills", institution: "Coursera", date: "2024" },
+      { title: "Active Listening: Enhancing Communication Skills", institution: "Coursera", date: "2024", assetHint: "Active Listening Enhancing Communication" },
+      { title: "Developing Interpersonal Skills", institution: "Coursera", date: "2024" },
+      { title: "Work Smarter, Not Harder: Time Management for Personal & Professional Productivity", institution: "Coursera", date: "2024" },
+      { title: "Emotional Intelligence in the Workplace", institution: "Coursera", date: "2024" },
+      { title: "Finding Your Professional Voice: Confidence & Impact", institution: "Coursera", date: "2024" },
+      { title: "Introduction to Personal Branding", institution: "Coursera", date: "2024" },
+      { title: "Leading with Impact: Team Dynamics, Strategy and Ethics", institution: "Coursera", date: "2024" },
+      { title: "Financial Planning for Young Adults", institution: "Coursera", date: "2024" },
+      { title: "Preparation for Job Interview", institution: "Coursera", date: "2024", assetHint: "Preparation for Job Interviews" },
+    ],
+  },
+  {
+    title: "AI Bootcamp",
+    items: [
+      { title: "Generative AI: Prompt Engineering Basics", institution: "Coursera", date: "2024", assetHint: "Generative AI Prompt Engineering Basics" },
+      { title: "AI For Everyone", institution: "Coursera", date: "2024" },
+      { title: "Introduction to Artificial Intelligence", institution: "Coursera", date: "2024", assetHint: "Introduction to AI" },
+      { title: "Introduction to Generative AI", institution: "Coursera", date: "2024" },
+      { title: "AI Essentials", institution: "Coursera", date: "2024", assetHint: "AI Essential" },
+      { title: "Generative AI with Large Language Models", institution: "Coursera", date: "2024" },
+      { title: "AI Foundations: Prompt Engineering with ChatGPT", institution: "Coursera", date: "2024", assetHint: "AI Foundations Prompt Engineering with ChatGPT" },
+      { title: "Python for Data Science, AI and Development", institution: "Coursera", date: null },
+      { title: "Supervised Machine Learning: Regression and Classification", institution: "Coursera", date: "2024", assetHint: "Supervised Machine Learning Regression and Classification" },
+      { title: "Advanced Learning Algorithms", institution: "Coursera", date: "2024" },
+      { title: "Unsupervised Learning, Recommenders, Reinforcement Learning", institution: "Coursera", date: "2024" },
+      { title: "Trustworthy AI: Managing Bias, Ethics and Accountability", institution: "Coursera", date: "2024" },
+      { title: "Introduction to Responsible AI", institution: "Coursera", date: "2024" },
+    ],
+  },
+  {
+    title: "Google AI Essentials Specialization",
+    items: [
+      { title: "Introduction to AI", institution: "Google", date: "2024", assetHint: "Introduction to AI" },
+      { title: "Maximize Productivity with AI Tools", institution: "Google", date: "2024" },
+      { title: "Discover the Art of Prompting", institution: "Google", date: "2024" },
+      { title: "Use AI Responsibly", institution: "Google", date: "2024" },
+      { title: "Stay Ahead of the AI Curve", institution: "Google", date: "2024" },
+      { title: "Google AI Essentials", institution: "Google", date: "2024" },
+    ],
+  },
+  {
+    title: "School Certificate",
+    items: [
+      { title: "Higher Certificate in Information Technology", institution: "Institution not listed", date: null },
+      { title: "Diploma in Information Technology", institution: "Institution not listed", date: null },
+    ],
+  },
+  {
+    title: "CCNA",
+    items: [
+      { title: "CCNA: Enterprise Networking, Security and Automation", institution: "Cisco Networking Academy", date: "2024", assetHint: "CCNA Enterprise Networking Security and Automation_" },
+      { title: "CCNA: Introduction to Networks", institution: "Cisco Networking Academy", date: "2024" },
+      { title: "Introduction to Cybersecurity", institution: "Cisco Networking Academy", date: "2024" },
+    ],
+  },
+];
+
+function buildAssetLookup() {
+  return Object.entries(certificateAssets).reduce<Record<string, string>>((acc, [path, url]) => {
+    const fileName = path.split("/").pop() ?? "";
+    const basename = fileName.replace(/\.[^.]+$/, "").toLowerCase();
+    acc[basename] = url;
+    acc[basename.replace(/[^a-z0-9]+/g, " ").trim()] = url;
+    return acc;
+  }, {});
+}
+
+const assetLookup = buildAssetLookup();
+
+function resolveAssetUrl(assetHint?: string) {
+  if (!assetHint) return null;
+  const normalized = assetHint.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return assetLookup[normalized] ?? null;
+}
+
+function normalizeFileType(url: string | null) {
+  if (!url) return "pdf";
+  const ext = (url.split(".").pop() || "pdf").toLowerCase();
+  if (["jpg", "jpeg", "png"].includes(ext)) return ext;
+  return "pdf";
+}
+
+function buildDownloadFilename(title: string, url: string | null) {
+  const ext = normalizeFileType(url);
+  const safe = title.replace(/[^a-z0-9-_ ]/gi, "").trim().replace(/\s+/g, "_") || "certificate";
+  return `${safe}.${ext}`;
+}
 
 export const Route = createFileRoute("/certifications")({
   head: () => ({
@@ -17,232 +126,82 @@ export const Route = createFileRoute("/certifications")({
   component: CertificationsPage,
 });
 
-type Certificate = {
-  id: string;
-  title: string;
-  institution: string;
-  date_issued: string;
-  description: string | null;
-  file_url: string;
-  file_path: string;
-  file_type: string;
-};
-
 function CertificationsPage() {
-  const [certs, setCerts] = useState<Certificate[]>([]);
-  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [viewing, setViewing] = useState<Certificate | null>(null);
+  const [viewing, setViewing] = useState<CertificateItem | null>(null);
   const [viewingUrl, setViewingUrl] = useState<string | null>(null);
   const [viewingError, setViewingError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
-  const carouselRef = useRef<HTMLDivElement | null>(null);
-  const autoplayRef = useRef<number | null>(null);
-  const pointerStartX = useRef<number | null>(null);
-  const pointerCurrentX = useRef<number | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [savedScrollPosition, setSavedScrollPosition] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase
-        .from("certificates")
-        .select("*")
-        .order("date_issued", { ascending: false });
-      if (error) console.error("Failed to load certificates", error);
-      const list = (data as Certificate[]) ?? [];
-      setCerts(list);
-      setLoading(false);
+  const resolvedCategories = useMemo(
+    () =>
+      categories.map((category) => ({
+        ...category,
+        items: category.items.map((item) => ({
+          ...item,
+          assetUrl: resolveAssetUrl(item.assetHint ?? item.title),
+        })),
+      })),
+    [],
+  );
 
-      // Pre-generate signed URLs for image previews in cards
-      const entries = await Promise.all(
-        list.map(async (c) => {
-          if (!c.file_path) return [c.id, ""] as const;
-          const { data: signed, error: sErr } = await supabase.storage
-            .from("certificates")
-            .createSignedUrl(c.file_path, 3600);
-          if (sErr) console.error("Signed URL error for", c.id, sErr);
-          return [c.id, signed?.signedUrl ?? ""] as const;
-        }),
-      );
-      setSignedUrls(Object.fromEntries(entries));
-    })();
-  }, []);
-
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setIsOpen(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (certs.length === 0) return;
-    if (autoplayRef.current) window.clearInterval(autoplayRef.current);
-    autoplayRef.current = window.setInterval(() => {
-      setSelectedIndex((prev) => {
-        const next = (prev + 1) % filtered.length;
-        scrollToIndex(next);
-        return next;
-      });
-    }, 5000);
-    return () => {
-      if (autoplayRef.current) window.clearInterval(autoplayRef.current);
-    };
-  }, [certs]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return certs;
-    return certs.filter((c) =>
-      c.title.toLowerCase().includes(q) ||
-      c.institution.toLowerCase().includes(q) ||
-      (c.description ?? "").toLowerCase().includes(q),
-    );
-  }, [certs, query]);
-
-  useEffect(() => {
-    if (selectedIndex >= filtered.length) setSelectedIndex(0);
-  }, [filtered, selectedIndex]);
-
-  const hasResults = filtered.length > 0;
-
-  function getCertificateUrl(cert: Certificate): string {
-    return signedUrls[cert.id] ?? "";
-  }
-
-  function buildDownloadFilename(cert: Certificate): string {
-    const ext = (cert.file_path.split(".").pop() || (cert.file_type === "application/pdf" ? "pdf" : "bin")).toLowerCase();
-    const safe = cert.title.replace(/[^a-z0-9-_ ]/gi, "").trim().replace(/\s+/g, "_") || "certificate";
-    return `${safe}.${ext}`;
-  }
-
-  async function openCertificate(cert: Certificate) {
-    console.log("[cert] open", cert.id, cert.file_path);
-    setViewing(cert);
-    setIsOpen(true);
-    setViewingError(null);
+  function closeViewer() {
+    setIsOpen(false);
+    setViewing(null);
     setViewingUrl(null);
-    if (!cert.file_path) {
-      console.error("[cert] no file_path for", cert.id);
-      setViewingError("Certificate file not available.");
+    setViewingError(null);
+    setZoom(1);
+    window.scrollTo({ top: savedScrollPosition, behavior: "auto" });
+  }
+
+  function openViewer(item: CertificateItem & { assetUrl?: string | null }) {
+    if (!item.assetUrl) {
+      setViewing(item);
+      setViewingUrl(null);
+      setViewingError("Certificate file is not available in the local assets folder.");
+      setSavedScrollPosition(window.scrollY);
+      setZoom(1);
+      setIsOpen(true);
       return;
     }
-    const { data: viewData, error: viewErr } = await supabase.storage
-      .from("certificates")
-      .createSignedUrl(cert.file_path, 3600);
-    if (viewErr || !viewData?.signedUrl) {
-      console.error("[cert] signed url failed", viewErr);
-      setViewingError("Certificate file not available.");
-      return;
-    }
-    console.log("[cert] view url ready");
-    setViewingUrl(viewData.signedUrl);
+
+    setViewing(item);
+    setViewingUrl(item.assetUrl);
+    setViewingError(null);
+    setSavedScrollPosition(window.scrollY);
+    setZoom(1);
+    setIsOpen(true);
   }
 
   async function downloadCurrent() {
     if (!viewing || !viewingUrl) return;
-    const filename = buildDownloadFilename(viewing);
+    const filename = buildDownloadFilename(viewing.title, viewingUrl);
     try {
-      const res = await fetch(viewingUrl);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
+      const response = await fetch(viewingUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
       setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    } catch (err) {
-      console.error("[cert] download failed", err);
-      // Fallback: navigate to a download-scoped signed URL
-      const { data } = await supabase.storage
-        .from("certificates")
-        .createSignedUrl(viewing.file_path, 3600, { download: filename });
-      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+    } catch (error) {
+      console.error("Failed to download certificate", error);
     }
   }
 
-  // Prevent background scrolling while modal open
-  useEffect(() => {
-    if (isOpen) {
-      const prev = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = prev; };
-    }
+  useMemo(() => {
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
   }, [isOpen]);
-
-
-  function scrollToIndex(index: number) {
-    if (!carouselRef.current) return;
-    const child = carouselRef.current.children[index] as HTMLElement | undefined;
-    if (!child) return;
-    child.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-    setSelectedIndex(index);
-  }
-
-  function handlePrev() {
-    if (!hasResults) return;
-    const next = selectedIndex === 0 ? filtered.length - 1 : selectedIndex - 1;
-    scrollToIndex(next);
-  }
-
-  function handleNext() {
-    if (!hasResults) return;
-    const next = selectedIndex === filtered.length - 1 ? 0 : selectedIndex + 1;
-    scrollToIndex(next);
-  }
-
-  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
-    pointerStartX.current = event.clientX;
-    pointerCurrentX.current = event.clientX;
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
-    if (pointerStartX.current === null) return;
-    pointerCurrentX.current = event.clientX;
-  }
-
-  function handlePointerUp() {
-    if (pointerStartX.current === null || pointerCurrentX.current === null) {
-      pointerStartX.current = null;
-      pointerCurrentX.current = null;
-      return;
-    }
-    const delta = pointerCurrentX.current - pointerStartX.current;
-    if (Math.abs(delta) > 40) {
-      if (delta > 0) handlePrev(); else handleNext();
-    }
-    pointerStartX.current = null;
-    pointerCurrentX.current = null;
-  }
-
-  function pauseAutoplay() {
-    if (autoplayRef.current) {
-      window.clearInterval(autoplayRef.current);
-      autoplayRef.current = null;
-    }
-  }
-
-  function resumeAutoplay() {
-    if (autoplayRef.current || filtered.length === 0) return;
-    autoplayRef.current = window.setInterval(() => {
-      setSelectedIndex((prev) => {
-        const next = (prev + 1) % filtered.length;
-        scrollToIndex(next);
-        return next;
-      });
-    }, 5000);
-  }
-
-  useEffect(() => {
-    if (!hasResults) return;
-    scrollToIndex(selectedIndex);
-  }, [filtered]);
 
   return (
     <SiteLayout>
@@ -251,148 +210,106 @@ function CertificationsPage() {
         title="Qualifications and ongoing training"
         description="Formal qualifications and structured professional training that support my IT career foundation."
       />
-      <Container>
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full max-w-sm">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search certificates…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={handlePrev} size="sm">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" onClick={handleNext} size="sm">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+      <Container className="space-y-8">
+        <div className="rounded-3xl border border-border bg-card/60 p-6 shadow-sm">
+          <p className="text-sm uppercase tracking-[0.28em] text-primary">Certifications hub</p>
+          <h2 className="mt-3 text-2xl font-semibold">A categorized view of professional and technical training</h2>
+          <p className="mt-3 max-w-3xl text-sm text-muted-foreground">
+            Browse certificates grouped by topic, then open each one in a full-sized viewer with download support.
+          </p>
         </div>
 
-        {loading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : !hasResults ? (
-          <div className="rounded-xl border border-dashed border-border p-10 text-center">
-            <BadgeCheck className="mx-auto h-8 w-8 text-muted-foreground" />
-            <p className="mt-3 text-sm text-muted-foreground">
-              {certs.length === 0 ? "No certificates available yet." : "No certificates match your search."}
-            </p>
-          </div>
-        ) : (
-          <div className="relative">
-            <div
-              ref={carouselRef}
-              className="flex gap-4 overflow-x-auto scroll-smooth pb-4 pt-2"
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerLeave={handlePointerUp}
-              onMouseEnter={pauseAutoplay}
-              onMouseLeave={resumeAutoplay}
-            >
-              {filtered.map((cert, index) => (
+        {resolvedCategories.map((category) => (
+          <section key={category.title} className="space-y-4">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-semibold">{category.title}</h3>
+                {category.description ? <p className="mt-1 text-sm text-muted-foreground">{category.description}</p> : null}
+              </div>
+            </div>
+            <div className="flex gap-4 overflow-x-auto pb-3 scroll-smooth snap-x snap-mandatory">
+              {category.items.map((item) => (
                 <article
-                  key={cert.id}
-                  className={`min-w-[90%] sm:min-w-[45%] lg:min-w-[30%] rounded-3xl border p-6 shadow-sm transition-transform duration-300 ${selectedIndex === index ? "scale-[1.01] border-primary bg-card" : "bg-background border-border"}`}
-                  onClick={() => {
-                    setSelectedIndex(index);
-                    scrollToIndex(index);
-                  }}
+                  key={item.title}
+                  className="group flex min-w-[260px] max-w-[280px] flex-col rounded-3xl border border-border bg-background p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-md sm:min-w-[280px]"
                 >
-                  <div className="flex h-44 items-center justify-center overflow-hidden rounded-3xl bg-muted">
-                    {cert.file_type === "application/pdf" ? (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                        <FileText className="h-12 w-12" />
-                      </div>
-                    ) : (
-                      <img src={getCertificateUrl(cert)} alt={cert.title} className="h-full w-full object-cover" />
-                    )}
+                  <div className="flex h-36 items-center justify-center rounded-2xl bg-muted text-center">
+                    <p className="px-4 text-sm font-medium text-muted-foreground">{item.title}</p>
                   </div>
-                  <div className="mt-5 space-y-3">
-                    <div>
-                      <h3 className="text-lg font-semibold leading-snug">{cert.title}</h3>
-                      <p className="text-sm text-muted-foreground">{cert.institution}</p>
-                    </div>
-                    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span>{new Date(cert.date_issued).toLocaleDateString(undefined, { year: "numeric" })}</span>
-                      <span className="rounded-full bg-accent/30 px-2 py-1">{cert.file_type === "application/pdf" ? "PDF" : "Image"}</span>
-                    </div>
-                    <Button type="button" size="sm" className="w-full" onClick={(e) => { e.stopPropagation(); openCertificate(cert); }}>
-                      View Certificate
+                  <div className="mt-5 flex flex-1 flex-col">
+                    <h4 className="text-base font-semibold leading-snug">{item.title}</h4>
+                    <p className="mt-2 text-sm text-muted-foreground">{item.institution}</p>
+                    {item.date ? (
+                      <p className="mt-3 text-xs uppercase tracking-[0.24em] text-primary">Completed {item.date}</p>
+                    ) : (
+                      <p className="mt-3 text-xs uppercase tracking-[0.24em] text-muted-foreground">Date not listed</p>
+                    )}
+                    <div className="mt-5 flex-1" />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-full"
+                      variant={item.assetUrl ? "default" : "outline"}
+                      onClick={() => openViewer(item)}
+                    >
+                      {item.assetUrl ? "View Certificate" : "Certificate unavailable"}
                     </Button>
-
                   </div>
                 </article>
               ))}
             </div>
-            <div className="mt-5 flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              {filtered.map((_, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => scrollToIndex(idx)}
-                  className={`h-2.5 w-2.5 rounded-full transition-colors ${selectedIndex === idx ? "bg-primary" : "bg-border"}`}
-                  aria-label={`Go to certificate ${idx + 1}`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+          </section>
+        ))}
       </Container>
 
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-6xl w-full p-0 overflow-hidden">
-          {viewing && (
-            <div className="flex flex-col bg-background">
-              <DialogHeader className="border-b border-border p-6">
-                <DialogTitle>{viewing.title}</DialogTitle>
-                <DialogDescription>{viewing.institution} · {new Date(viewing.date_issued).toLocaleDateString(undefined, { year: "numeric", month: "long" })}</DialogDescription>
-              </DialogHeader>
-              <div className="relative h-[75vh] bg-muted">
-                <button
-                  type="button"
-                  onClick={() => setIsOpen(false)}
-                  className="absolute right-4 top-4 z-10 rounded-full bg-background/90 p-2 text-muted-foreground transition hover:text-foreground"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-                {viewingError ? (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">{viewingError}</div>
-                ) : !viewingUrl ? (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Loading certificate…</div>
-                ) : viewing.file_type === "application/pdf" ? (
-                  <iframe src={viewingUrl} title={viewing.title} className="h-full w-full" />
-                ) : (
-                  <img src={viewingUrl} alt={viewing.title} className="h-full w-full object-contain" />
-                )}
+      {isOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="relative mx-3 flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6">
+              <div>
+                <h3 className="text-lg font-semibold">{viewing?.title}</h3>
+                <p className="text-sm text-muted-foreground">{viewing?.institution}</p>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border p-4">
-                <div className="text-sm text-muted-foreground">Full-screen support available via browser controls.</div>
-                <div className="flex gap-2">
-                  {viewingUrl && (
-                    <>
-                      <Button type="button" size="sm" variant="outline" onClick={downloadCurrent}>
-                        <Download className="h-3.5 w-3.5" />
-                        Download Certificate
-                      </Button>
-                      <Button asChild size="sm" variant="outline">
-                        <a href={viewingUrl} target="_blank" rel="noreferrer">Open in new tab</a>
-                      </Button>
-                    </>
-                  )}
-                  <DialogClose asChild>
-                    <Button size="sm">Close</Button>
-                  </DialogClose>
-                </div>
+              <div className="flex items-center gap-2">
+                <Button type="button" size="icon" variant="outline" onClick={() => setZoom((value) => Math.min(2, Number((value + 0.25).toFixed(2))))}>
+                  <ZoomIn className="h-4 w-4" />
+                </Button>
+                <Button type="button" size="icon" variant="outline" onClick={() => setZoom((value) => Math.max(0.75, Number((value - 0.25).toFixed(2))))}>
+                  <ZoomOut className="h-4 w-4" />
+                </Button>
+                <Button type="button" size="icon" variant="outline" onClick={() => setZoom(1)}>
+                  <RotateCcw className="h-4 w-4" />
+                </Button>
+                <Button type="button" size="icon" variant="outline" onClick={downloadCurrent} disabled={!viewingUrl}>
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button type="button" size="icon" variant="outline" onClick={closeViewer}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            <div className="flex-1 overflow-auto bg-muted p-3 sm:p-5">
+              {viewingError ? (
+                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border bg-background p-10 text-center text-sm text-muted-foreground">
+                  {viewingError}
+                </div>
+              ) : !viewingUrl ? (
+                <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-border bg-background p-10 text-center text-sm text-muted-foreground">
+                  Loading certificate…
+                </div>
+              ) : normalizeFileType(viewingUrl) === "pdf" ? (
+                <div className="flex min-h-full items-center justify-center rounded-2xl bg-background p-2" style={{ transform: `scale(${zoom})`, transformOrigin: "center top" }}>
+                  <iframe src={viewingUrl} title={viewing?.title} className="h-[70vh] w-full rounded-2xl border border-border" />
+                </div>
+              ) : (
+                <div className="flex min-h-full items-center justify-center rounded-2xl bg-background p-2">
+                  <img src={viewingUrl} alt={viewing?.title} className="max-h-full w-full object-contain" style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </SiteLayout>
   );
 }
