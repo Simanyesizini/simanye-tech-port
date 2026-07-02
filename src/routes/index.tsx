@@ -101,12 +101,6 @@ function Home() {
               >
                 <Download className="h-4 w-4" /> Download CV
               </a>
-              <Link
-                to="/auth"
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-muted px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-border"
-              >
-                Admin Login
-              </Link>
             </div>
           </div>
           <div className="relative mx-auto w-full max-w-sm">

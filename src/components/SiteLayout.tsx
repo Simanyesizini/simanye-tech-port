@@ -103,15 +103,7 @@ function Footer() {
 
   return (
     <footer className="mt-24 border-t border-border bg-surface">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 sm:px-8 md:grid-cols-3">
-        <div>
-          <div className="font-semibold">
-            Simanye Tevin Sizini
-          </div>
-          <p className="mt-3 text-sm text-muted-foreground max-w-xs">
-            IT Support graduate and CAPACITI INTERN passionate about solving technical problems and supporting efficient digital environments.
-          </p>
-        </div>
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-12 sm:px-8 md:grid-cols-2">
         <div>
           <h4 className="text-sm font-semibold">Quick Links</h4>
           <ul className="mt-3 grid grid-cols-2 gap-y-2 text-sm">
