@@ -11,8 +11,7 @@ export const sendContactMessage = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => schema.parse(data))
   .handler(async ({ data }) => {
     const RESEND_API_KEY = process.env.RESEND_API_KEY;
-    const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
-    if (!RESEND_API_KEY || !LOVABLE_API_KEY) {
+    if (!RESEND_API_KEY) {
       throw new Error("Email service is not configured");
     }
 
@@ -27,12 +26,11 @@ export const sendContactMessage = createServerFn({ method: "POST" })
       <p><small>Sent: ${now}</small></p>
     `;
 
-    const res = await fetch("https://connector-gateway.lovable.dev/resend/emails", {
+    const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": RESEND_API_KEY,
+        Authorization: `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
         from: "Portfolio Contact <onboarding@resend.dev>",
