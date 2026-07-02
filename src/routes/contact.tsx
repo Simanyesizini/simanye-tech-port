@@ -2,9 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
-import { Mail, Phone, Github, Linkedin, Download, Send, CheckCircle2 } from "lucide-react";
+import { Mail, Phone, Github, Linkedin, Download, Send, CheckCircle2, Loader2 } from "lucide-react";
 import { z } from "zod";
+import { toast } from "sonner";
 import { getSignedAssetUrl } from "@/lib/site-assets";
+import { sendContactMessage } from "@/lib/send-contact.functions";
 
 type ContactInfo = {
   email: string;
@@ -45,9 +47,13 @@ function ContactPage() {
     })();
   }, []);
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const [sending, setSending] = useState(false);
+  
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const parsed = schema.safeParse({
       name: fd.get("name"),
       email: fd.get("email"),
@@ -60,11 +66,21 @@ function ContactPage() {
       return;
     }
     setErrors({});
-    const subject = encodeURIComponent(`Portfolio enquiry from ${parsed.data.name}`);
-    const body = encodeURIComponent(`${parsed.data.message}\n\n— ${parsed.data.name} (${parsed.data.email})`);
-    const toEmail = contactInfo?.email ?? "Simanyetevin@gmail.com";
-    window.location.href = `mailto:${toEmail}?subject=${subject}&body=${body}`;
-    setSubmitted(true);
+    setSending(true);
+    try {
+      await sendContactMessage({ data: parsed.data });
+      toast.success("Message sent successfully!", {
+        description: "Thank you — I'll be in touch shortly.",
+      });
+      form.reset();
+      setSubmitted(true);
+      setTimeout(() => setSubmitted(false), 4000);
+    } catch (err) {
+      console.error("[contact] send failed", err);
+      toast.error("Unable to send your message. Please try again later.");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -136,8 +152,8 @@ function ContactPage() {
               <Field id="message" label="Message" error={errors.message}>
                 <textarea id="message" name="message" rows={5} maxLength={1000} className="input resize-y" placeholder="How can I help?" />
               </Field>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-                {submitted ? <><CheckCircle2 className="h-4 w-4" /> Opened in your email app</> : <><Send className="h-4 w-4" /> Send Message</>}
+              <button type="submit" disabled={sending} className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed">
+                {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending message...</> : submitted ? <><CheckCircle2 className="h-4 w-4" /> Message sent</> : <><Send className="h-4 w-4" /> Send Message</>}
               </button>
             </div>
           </form>
