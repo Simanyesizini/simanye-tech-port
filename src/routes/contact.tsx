@@ -171,6 +171,12 @@ function ContactPage() {
               <Field id="email" label="Email" error={errors.email}>
                 <input id="email" name="email" type="email" maxLength={255} className="input" placeholder="you@example.com" />
               </Field>
+              <Field id="phone" label="Phone (optional)" error={errors.phone}>
+                <input id="phone" name="phone" type="tel" maxLength={30} className="input" placeholder="+27 64 095 1511" />
+              </Field>
+              <Field id="subject" label="Subject" error={errors.subject}>
+                <input id="subject" name="subject" maxLength={150} className="input" placeholder="What is this about?" />
+              </Field>
               <Field id="message" label="Message" error={errors.message}>
                 <textarea id="message" name="message" rows={5} maxLength={1000} className="input resize-y" placeholder="How can I help?" />
               </Field>
