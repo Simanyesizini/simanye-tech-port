@@ -6,7 +6,6 @@ import { Mail, Phone, Github, Linkedin, Download, Send, CheckCircle2, Loader2 } 
 import { z } from "zod";
 import { toast } from "sonner";
 import { getSignedAssetUrl } from "@/lib/site-assets";
-const WEB3FORMS_ACCESS_KEY = "YOUR_WEB3FORMS_ACCESS_KEY";
 
 type ContactInfo = {
   email: string;
@@ -73,23 +72,20 @@ function ContactPage() {
     setErrors({});
     setSending(true);
     try {
-      const res = await fetch("https://api.web3forms.com/submit", {
+      const res = await fetch("/api/send-contact-message", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
-          access_key: WEB3FORMS_ACCESS_KEY,
-          subject: parsed.data.subject,
-          from_name: parsed.data.name,
-          replyto: parsed.data.email,
           name: parsed.data.name,
           email: parsed.data.email,
           phone: parsed.data.phone || "Not provided",
+          subject: parsed.data.subject,
           message: parsed.data.message,
         }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) {
-        throw new Error(json.message || `Request failed: ${res.status}`);
+        throw new Error(json.error || json.message || `Request failed: ${res.status}`);
       }
       toast.success("Message sent successfully!", {
         description: "Thank you — I'll be in touch shortly.",

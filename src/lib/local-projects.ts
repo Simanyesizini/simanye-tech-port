@@ -102,6 +102,8 @@ export function saveStoredPortfolioProjects(projects: StoredPortfolioProject[]) 
   window.localStorage.setItem(PORTFOLIO_PROJECTS_KEY, JSON.stringify(projects));
 }
 
+const DEFAULT_PROJECT_IMAGE_URL = "https://i.postimg.cc/6p9bvyF4/Reliable.png";
+
 export const DEFAULT_PORTFOLIO_PROJECT: StoredPortfolioProject = {
   id: "74c7d9ef-cc36-490f-a9ef-9d6ce6370732",
   title: "Shop Smarter with Reliable",
@@ -125,7 +127,7 @@ export const DEFAULT_PORTFOLIO_PROJECT: StoredPortfolioProject = {
     "Fast performance",
     "Secure database integration",
   ],
-  imageUrl: "",
+  imageUrl: DEFAULT_PROJECT_IMAGE_URL,
   createdAt: new Date().toISOString(),
 };
 
