@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
-import { Download, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { Download, X, ZoomIn, ZoomOut, RotateCcw, FileText } from "lucide-react";
 
 const certificateAssets = import.meta.glob("@/assets/*.{pdf,jpg,jpeg,png}", {
   eager: true,
