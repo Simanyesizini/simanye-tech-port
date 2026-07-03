@@ -110,9 +110,9 @@ export const DEFAULT_PORTFOLIO_PROJECT: StoredPortfolioProject = {
   description:
     "A modern AI-powered online marketplace designed to provide a seamless and intelligent shopping experience. The platform features AI-powered customer support, secure user authentication, smart product search and filtering, shopping cart functionality, order management, and a clean, responsive user interface that enhances the overall customer experience.",
   technologies: ["React", "TypeScript", "Tailwind CSS", "Supabase", "Vite", "AI Integration", "Responsive Design"],
-  projectLink: "",
+  projectLink: "https://assist-smart-commerce.lovable.app",
   githubLink: "",
-  liveDemoLink: "",
+  liveDemoLink: "https://assist-smart-commerce.lovable.app",
   category: "Web Application",
   status: "Completed",
   features: [
