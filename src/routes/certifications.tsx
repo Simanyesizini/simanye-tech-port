@@ -71,8 +71,8 @@ const categories: CertificateCategory[] = [
   {
     title: "School Certificate",
     items: [
-      { title: "Higher Certificate in Information Technology", institution: "Institution not listed", date: null },
-      { title: "Diploma in Information Technology", institution: "Institution not listed", date: null },
+      { title: "Higher Certificate in Information Technology", institution: "Nelson Mandela University", date: "2022" },
+      { title: "Diploma in Information Technology", institution: "Nelson Mandela University", date: "2025" },
     ],
   },
   {
