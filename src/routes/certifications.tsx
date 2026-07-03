@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
-import { Download, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { Download, X, ZoomIn, ZoomOut, RotateCcw, FileText } from "lucide-react";
 
 const certificateAssets = import.meta.glob("@/assets/*.{pdf,jpg,jpeg,png}", {
   eager: true,
@@ -260,8 +260,12 @@ function CertificationsPage() {
                   key={item.title}
                   className="group flex min-w-[260px] max-w-[280px] flex-col rounded-3xl border border-border bg-background p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-md sm:min-w-[280px]"
                 >
-                  <div className="flex h-36 items-center justify-center rounded-2xl bg-muted text-center">
-                    <p className="px-4 text-sm font-medium text-muted-foreground">{item.title}</p>
+                  <div className="flex h-36 items-center justify-center overflow-hidden rounded-2xl bg-muted">
+                    {item.assetUrl && ["jpg", "jpeg", "png"].includes(normalizeFileType(item.assetUrl)) ? (
+                      <img src={item.assetUrl} alt={item.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <FileText className="h-10 w-10 text-muted-foreground" />
+                    )}
                   </div>
                   <div className="mt-5 flex flex-1 flex-col">
                     <h4 className="text-base font-semibold leading-snug">{item.title}</h4>
