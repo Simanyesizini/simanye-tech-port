@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Download, X, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
@@ -133,6 +133,9 @@ function CertificationsPage() {
   const [isOpen, setIsOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [savedScrollPosition, setSavedScrollPosition] = useState(0);
+  const bodyOverflowRef = useRef<string | null>(null);
+  const htmlOverflowRef = useRef<string | null>(null);
+  const overlayRef = useRef<HTMLDivElement | null>(null);
 
   const resolvedCategories = useMemo(
     () =>
@@ -194,12 +197,36 @@ function CertificationsPage() {
     }
   }
 
-  useMemo(() => {
+  useEffect(() => {
     if (!isOpen) return;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+
+    const body = document.body;
+    const html = document.documentElement;
+    bodyOverflowRef.current = body.style.overflow;
+    htmlOverflowRef.current = html.style.overflow;
+    body.style.overflow = "hidden";
+    html.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeViewer();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+
     return () => {
-      document.body.style.overflow = originalOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      if (bodyOverflowRef.current !== null) {
+        body.style.overflow = bodyOverflowRef.current;
+      } else {
+        body.style.removeProperty("overflow");
+      }
+      if (htmlOverflowRef.current !== null) {
+        html.style.overflow = htmlOverflowRef.current;
+      } else {
+        html.style.removeProperty("overflow");
+      }
     };
   }, [isOpen]);
 
@@ -263,7 +290,15 @@ function CertificationsPage() {
       </Container>
 
       {isOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+        <div
+          ref={overlayRef}
+          onMouseDown={(event) => {
+            if (event.target === overlayRef.current) {
+              closeViewer();
+            }
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm"
+        >
           <div className="relative mx-3 flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl">
             <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6">
               <div>
