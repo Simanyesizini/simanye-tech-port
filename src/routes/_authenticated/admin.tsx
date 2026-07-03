@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import {
   convertSupabaseProjects,
+  DEFAULT_PORTFOLIO_PROJECT,
+  parseProjectFeatures,
   parseProjectTechnologies,
   readProjectImageFile,
   readStoredPortfolioProjects,
@@ -189,6 +191,11 @@ function AdminPage() {
   const [projDesc, setProjDesc] = useState("");
   const [projTech, setProjTech] = useState("");
   const [projLink, setProjLink] = useState("");
+  const [projGithubLink, setProjGithubLink] = useState("");
+  const [projLiveDemoLink, setProjLiveDemoLink] = useState("");
+  const [projCategory, setProjCategory] = useState("");
+  const [projStatus, setProjStatus] = useState("");
+  const [projFeatures, setProjFeatures] = useState("");
   const [projFile, setProjFile] = useState<File | null>(null);
   const [projFileInputKey, setProjFileInputKey] = useState(0);
   const [projLoading, setProjLoading] = useState(false);
@@ -326,14 +333,23 @@ function AdminPage() {
   async function loadProjects() {
     const storedProjects = readStoredPortfolioProjects();
     if (storedProjects !== null) {
-      setProjects(storedProjects);
+      const nextProjects = storedProjects.some((project) => project.id === DEFAULT_PORTFOLIO_PROJECT.id)
+        ? storedProjects
+        : [DEFAULT_PORTFOLIO_PROJECT, ...storedProjects];
+      if (nextProjects.length !== storedProjects.length) {
+        saveStoredPortfolioProjects(nextProjects);
+      }
+      setProjects(nextProjects);
       return;
     }
 
     const { data } = await supabase.from("projects").select("*").order("display_order");
     const initialProjects = convertSupabaseProjects(data ?? []);
-    saveStoredPortfolioProjects(initialProjects);
-    setProjects(initialProjects);
+    const nextProjects = initialProjects.some((project) => project.id === DEFAULT_PORTFOLIO_PROJECT.id)
+      ? initialProjects
+      : [DEFAULT_PORTFOLIO_PROJECT, ...initialProjects];
+    saveStoredPortfolioProjects(nextProjects);
+    setProjects(nextProjects);
   }
 
   async function loadContactInfo() {
@@ -599,6 +615,11 @@ function AdminPage() {
       const title = projTitle.trim();
       const description = projDesc.trim();
       const projectLink = projLink.trim();
+      const githubLink = projGithubLink.trim();
+      const liveDemoLink = projLiveDemoLink.trim();
+      const category = projCategory.trim();
+      const status = projStatus.trim();
+      const features = projFeatures.trim();
 
       if (!title || !description) {
         setProjMsg("Error: Missing required fields");
@@ -610,6 +631,24 @@ function AdminPage() {
           new URL(projectLink);
         } catch {
           setProjMsg("Error: Project link must be a valid URL");
+          return;
+        }
+      }
+
+      if (githubLink) {
+        try {
+          new URL(githubLink);
+        } catch {
+          setProjMsg("Error: GitHub link must be a valid URL");
+          return;
+        }
+      }
+
+      if (liveDemoLink) {
+        try {
+          new URL(liveDemoLink);
+        } catch {
+          setProjMsg("Error: Live demo link must be a valid URL");
           return;
         }
       }
@@ -631,6 +670,11 @@ function AdminPage() {
         description,
         technologies: parseProjectTechnologies(projTech),
         projectLink,
+        githubLink,
+        liveDemoLink,
+        category,
+        status,
+        features: features ? parseProjectFeatures(features) : [],
         imageUrl,
         createdAt: existingProj?.createdAt ?? new Date().toISOString(),
       };
@@ -665,6 +709,11 @@ function AdminPage() {
     setProjDesc(proj.description);
     setProjTech(proj.technologies.join(", "));
     setProjLink(proj.projectLink);
+    setProjGithubLink(proj.githubLink);
+    setProjLiveDemoLink(proj.liveDemoLink);
+    setProjCategory(proj.category);
+    setProjStatus(proj.status);
+    setProjFeatures(proj.features.join("\n"));
     setProjFile(null);
     setProjMsg(null);
     setProjFileInputKey((key) => key + 1);
@@ -676,6 +725,11 @@ function AdminPage() {
     setProjDesc("");
     setProjTech("");
     setProjLink("");
+    setProjGithubLink("");
+    setProjLiveDemoLink("");
+    setProjCategory("");
+    setProjStatus("");
+    setProjFeatures("");
     setProjFile(null);
     setProjMsg(null);
     setProjFileInputKey((key) => key + 1);
@@ -1454,6 +1508,60 @@ function AdminPage() {
                   onChange={(e) => setProjLink(e.target.value)}
                   className="mt-1.5"
                   placeholder="https://..."
+                />
+              </div>
+              <div>
+                <Label htmlFor="proj-github">GitHub Link (optional)</Label>
+                <Input
+                  id="proj-github"
+                  type="url"
+                  value={projGithubLink}
+                  onChange={(e) => setProjGithubLink(e.target.value)}
+                  className="mt-1.5"
+                  placeholder="https://github.com/..."
+                />
+              </div>
+              <div>
+                <Label htmlFor="proj-live-demo">Live Demo Link (optional)</Label>
+                <Input
+                  id="proj-live-demo"
+                  type="url"
+                  value={projLiveDemoLink}
+                  onChange={(e) => setProjLiveDemoLink(e.target.value)}
+                  className="mt-1.5"
+                  placeholder="https://..."
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="proj-category">Category (optional)</Label>
+                  <Input
+                    id="proj-category"
+                    value={projCategory}
+                    onChange={(e) => setProjCategory(e.target.value)}
+                    className="mt-1.5"
+                    placeholder="Web Application"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="proj-status">Status (optional)</Label>
+                  <Input
+                    id="proj-status"
+                    value={projStatus}
+                    onChange={(e) => setProjStatus(e.target.value)}
+                    className="mt-1.5"
+                    placeholder="Completed"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="proj-features">Key Features (one per line)</Label>
+                <Textarea
+                  id="proj-features"
+                  value={projFeatures}
+                  onChange={(e) => setProjFeatures(e.target.value)}
+                  className="mt-1.5 min-h-24"
+                  placeholder="AI-powered customer support\nSecure user authentication\nSmart product search"
                 />
               </div>
               <div>

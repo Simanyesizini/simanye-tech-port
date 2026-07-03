@@ -6,6 +6,11 @@ export type StoredPortfolioProject = {
   description: string;
   technologies: string[];
   projectLink: string;
+  githubLink: string;
+  liveDemoLink: string;
+  category: string;
+  status: string;
+  features: string[];
   imageUrl: string;
   createdAt: string;
 };
@@ -16,6 +21,11 @@ type SupabaseProject = {
   description: string;
   technologies: string | null;
   link: string | null;
+  github_link?: string | null;
+  live_demo_link?: string | null;
+  category?: string | null;
+  status?: string | null;
+  features?: string | null;
   image_url: string | null;
   display_order?: number;
 };
@@ -23,6 +33,13 @@ type SupabaseProject = {
 export function parseProjectTechnologies(value: string): string[] {
   return value
     .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function parseProjectFeatures(value: string): string[] {
+  return value
+    .split(/\r?\n|,|;/)
     .map((item) => item.trim())
     .filter(Boolean);
 }
@@ -58,11 +75,20 @@ export function readStoredPortfolioProjects(): StoredPortfolioProject[] | null {
               ? parseProjectTechnologies(project.technologies)
               : [],
           projectLink: typeof project.projectLink === "string" ? project.projectLink : "",
-          imageUrl: typeof project.imageUrl === "string" ? project.imageUrl : "",
-          createdAt:
-            typeof project.createdAt === "string" && project.createdAt
-              ? project.createdAt
-              : new Date().toISOString(),
+        githubLink: typeof project.githubLink === "string" ? project.githubLink : "",
+        liveDemoLink: typeof project.liveDemoLink === "string" ? project.liveDemoLink : "",
+        category: typeof project.category === "string" ? project.category : "",
+        status: typeof project.status === "string" ? project.status : "",
+        features: Array.isArray(project.features)
+          ? project.features.filter((item: unknown): item is string => typeof item === "string")
+          : typeof project.features === "string"
+          ? parseProjectFeatures(project.features)
+          : [],
+        imageUrl: typeof project.imageUrl === "string" ? project.imageUrl : "",
+        createdAt:
+          typeof project.createdAt === "string" && project.createdAt
+            ? project.createdAt
+            : new Date().toISOString(),
         };
       })
       .filter((project): project is StoredPortfolioProject => Boolean(project));
@@ -76,6 +102,33 @@ export function saveStoredPortfolioProjects(projects: StoredPortfolioProject[]) 
   window.localStorage.setItem(PORTFOLIO_PROJECTS_KEY, JSON.stringify(projects));
 }
 
+export const DEFAULT_PORTFOLIO_PROJECT: StoredPortfolioProject = {
+  id: "74c7d9ef-cc36-490f-a9ef-9d6ce6370732",
+  title: "Shop Smarter with Reliable",
+  description:
+    "A modern AI-powered online marketplace designed to provide a seamless and intelligent shopping experience. The platform features AI-powered customer support, secure user authentication, smart product search and filtering, shopping cart functionality, order management, and a clean, responsive user interface that enhances the overall customer experience.",
+  technologies: ["React", "TypeScript", "Tailwind CSS", "Supabase", "Vite", "AI Integration", "Responsive Design"],
+  projectLink: "",
+  githubLink: "",
+  liveDemoLink: "",
+  category: "Web Application",
+  status: "Completed",
+  features: [
+    "AI-powered customer support",
+    "Secure user authentication",
+    "Smart product search",
+    "Product categories",
+    "Shopping cart",
+    "Order management",
+    "Responsive design",
+    "Modern UI/UX",
+    "Fast performance",
+    "Secure database integration",
+  ],
+  imageUrl: "",
+  createdAt: new Date().toISOString(),
+};
+
 export function convertSupabaseProjects(projects: SupabaseProject[]): StoredPortfolioProject[] {
   return projects
     .slice()
@@ -86,6 +139,11 @@ export function convertSupabaseProjects(projects: SupabaseProject[]): StoredPort
       description: project.description,
       technologies: project.technologies ? parseProjectTechnologies(project.technologies) : [],
       projectLink: project.link ?? "",
+      githubLink: project.github_link ?? "",
+      liveDemoLink: project.live_demo_link ?? "",
+      category: project.category ?? "",
+      status: project.status ?? "",
+      features: project.features ? parseProjectFeatures(project.features) : [],
       imageUrl: project.image_url ?? "",
       createdAt: new Date().toISOString(),
     }));
