@@ -2,9 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { SiteLayout, PageHeader, Container } from "@/components/SiteLayout";
-import { Mail, Phone, Github, Linkedin, Download, Send, CheckCircle2 } from "lucide-react";
+import { Mail, Phone, Github, Linkedin, Download, Send, CheckCircle2, Loader2 } from "lucide-react";
 import { z } from "zod";
+import { toast } from "sonner";
 import { getSignedAssetUrl } from "@/lib/site-assets";
+const WEB3FORMS_ACCESS_KEY = "YOUR_WEB3FORMS_ACCESS_KEY";
 
 type ContactInfo = {
   email: string;
@@ -26,6 +28,8 @@ export const Route = createFileRoute("/contact")({
 const schema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
   email: z.string().trim().email("Enter a valid email").max(255),
+  phone: z.string().trim().max(30).optional().or(z.literal("")),
+  subject: z.string().trim().min(1, "Subject is required").max(150),
   message: z.string().trim().min(1, "Message is required").max(1000),
 });
 
@@ -45,12 +49,19 @@ function ContactPage() {
     })();
   }, []);
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const [sending, setSending] = useState(false);
+  
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
+    if (sending) return;
+    const form = e.currentTarget;
+    const fd = new FormData(form);
     const parsed = schema.safeParse({
       name: fd.get("name"),
       email: fd.get("email"),
+      phone: fd.get("phone") ?? "",
+      subject: fd.get("subject"),
       message: fd.get("message"),
     });
     if (!parsed.success) {
@@ -60,11 +71,38 @@ function ContactPage() {
       return;
     }
     setErrors({});
-    const subject = encodeURIComponent(`Portfolio enquiry from ${parsed.data.name}`);
-    const body = encodeURIComponent(`${parsed.data.message}\n\n— ${parsed.data.name} (${parsed.data.email})`);
-    const toEmail = contactInfo?.email ?? "Simanyetevin@gmail.com";
-    window.location.href = `mailto:${toEmail}?subject=${subject}&body=${body}`;
-    setSubmitted(true);
+    setSending(true);
+    try {
+      const res = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_ACCESS_KEY,
+          subject: parsed.data.subject,
+          from_name: parsed.data.name,
+          replyto: parsed.data.email,
+          name: parsed.data.name,
+          email: parsed.data.email,
+          phone: parsed.data.phone || "Not provided",
+          message: parsed.data.message,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || `Request failed: ${res.status}`);
+      }
+      toast.success("Message sent successfully!", {
+        description: "Thank you — I'll be in touch shortly.",
+      });
+      form.reset();
+      setSubmitted(true);
+      setTimeout(() => setSubmitted(false), 4000);
+    } catch (err) {
+      console.error("[contact] send failed", err);
+      toast.error("Unable to send your message. Please try again later.");
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -133,11 +171,17 @@ function ContactPage() {
               <Field id="email" label="Email" error={errors.email}>
                 <input id="email" name="email" type="email" maxLength={255} className="input" placeholder="you@example.com" />
               </Field>
+              <Field id="phone" label="Phone (optional)" error={errors.phone}>
+                <input id="phone" name="phone" type="tel" maxLength={30} className="input" placeholder="+27 64 095 1511" />
+              </Field>
+              <Field id="subject" label="Subject" error={errors.subject}>
+                <input id="subject" name="subject" maxLength={150} className="input" placeholder="What is this about?" />
+              </Field>
               <Field id="message" label="Message" error={errors.message}>
                 <textarea id="message" name="message" rows={5} maxLength={1000} className="input resize-y" placeholder="How can I help?" />
               </Field>
-              <button type="submit" className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-                {submitted ? <><CheckCircle2 className="h-4 w-4" /> Opened in your email app</> : <><Send className="h-4 w-4" /> Send Message</>}
+              <button type="submit" disabled={sending} className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed">
+                {sending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending message...</> : submitted ? <><CheckCircle2 className="h-4 w-4" /> Message sent</> : <><Send className="h-4 w-4" /> Send Message</>}
               </button>
             </div>
           </form>
