@@ -152,7 +152,7 @@ export const DEFAULT_SPECIAL_EXAM_PROJECT: StoredPortfolioProject = {
     "Responsive design concept",
     "Process flow diagrams and system documentation",
   ],
-  imageUrl: "https://cdn.corenexis.com/f/1SvlL24WvA1.png",
+  imageUrl: "",
   createdAt: new Date().toISOString(),
 };
 
