@@ -131,6 +131,31 @@ export const DEFAULT_PORTFOLIO_PROJECT: StoredPortfolioProject = {
   createdAt: new Date().toISOString(),
 };
 
+export const DEFAULT_SPECIAL_EXAM_PROJECT: StoredPortfolioProject = {
+  id: "b3e21f6a-8d2f-4c1d-9f74-8f0a9c1e5a11",
+  title: "Special Exam Application System",
+  description:
+    "A final-year academic project that redesigns the university special examination application process into a modern web-based workflow. Delivered as UI mock-ups, process flows, and system documentation — emphasizing system analysis, user experience, and digital transformation rather than software development.",
+  technologies: ["Figma", "Microsoft Word", "Microsoft PowerPoint", "System Analysis & Design"],
+  projectLink: "",
+  githubLink: "",
+  liveDemoLink: "",
+  category: "Final Year Academic Project",
+  status: "Completed",
+  features: [
+    "Digital special examination application workflow",
+    "Student login and registration concept",
+    "Online application submission process",
+    "Application status tracking concept",
+    "Administrator review and approval workflow",
+    "User interface mock-up screens",
+    "Responsive design concept",
+    "Process flow diagrams and system documentation",
+  ],
+  imageUrl: "",
+  createdAt: new Date().toISOString(),
+};
+
 export function convertSupabaseProjects(projects: SupabaseProject[]): StoredPortfolioProject[] {
   return projects
     .slice()
