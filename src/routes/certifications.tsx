@@ -258,7 +258,12 @@ function CertificationsPage() {
           <section key={category.title} className="space-y-4">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <h3 className="text-xl font-semibold">{category.title}</h3>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <h3 className="text-xl font-semibold">{category.title}</h3>
+                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                    {category.items.length} {category.items.length === 1 ? "Certificate" : "Certificates"}
+                  </span>
+                </div>
                 {category.description ? <p className="mt-1 text-sm text-muted-foreground">{category.description}</p> : null}
               </div>
             </div>
