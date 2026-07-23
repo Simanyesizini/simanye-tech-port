@@ -92,6 +92,15 @@ const categories: CertificateCategory[] = [
       { title: "Introduction to Cybersecurity", institution: "Cisco Networking Academy", date: "2023" },
     ],
   },
+  {
+    title: "YES Youth",
+    description: "Work readiness and entrepreneurial certificates completed through YES One App.",
+    items: [
+      { title: "Entrepreneur Certificate", institution: "YES One App", date: "2026", category: "YES Youth" },
+      { title: "Digital Certificate", institution: "YES One App", date: "2026", category: "YES Youth" },
+      { title: "Work Readiness Certificate", institution: "YES One App", date: "2026", category: "YES Youth" },
+    ],
+  },
 ];
 
 function buildAssetLookup() {
