@@ -14,6 +14,7 @@ type CertificateItem = {
   institution: string;
   date: string | null;
   assetHint?: string;
+  category?: string;
 };
 
 type CertificateCategory = {
