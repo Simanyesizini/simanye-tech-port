@@ -331,7 +331,11 @@ function CertificationsPage() {
             <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6">
               <div>
                 <h3 className="text-lg font-semibold">{viewing?.title}</h3>
-                <p className="text-sm text-muted-foreground">{viewing?.institution}</p>
+                <p className="text-sm text-muted-foreground">
+                  {[viewing?.institution, viewing?.date ? `Completed ${viewing.date}` : null, viewing?.category]
+                    .filter(Boolean)
+                    .join(" • ")}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Button type="button" size="icon" variant="outline" onClick={() => setZoom((value) => Math.min(2, Number((value + 0.25).toFixed(2))))}>
