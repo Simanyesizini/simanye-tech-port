@@ -93,9 +93,8 @@ const categories: CertificateCategory[] = [
   },
   {
     title: "YES Youth",
-    description: "Work readiness and entrepreneurial certificates completed through YES One App.",
     items: [
-      { title: "Entrepreneur Certificate", institution: "YES One App", date: "2026" },
+      { title: "Entrepreneurship Certificate", institution: "YES One App", date: "2026" },
       { title: "Digital Certificate", institution: "YES One App", date: "2026" },
       { title: "Work Readiness Certificate", institution: "YES One App", date: "2026" },
     ],
