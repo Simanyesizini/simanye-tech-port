@@ -14,6 +14,7 @@ type CertificateItem = {
   institution: string;
   date: string | null;
   assetHint?: string;
+  category?: string;
 };
 
 type CertificateCategory = {
@@ -89,6 +90,15 @@ const categories: CertificateCategory[] = [
       { title: "CCNA: Enterprise Networking, Security and Automation", institution: "Cisco Networking Academy", date: "2026", assetHint: "CCNA Enterprise Networking Security and Automation_" },
       { title: "CCNA: Introduction to Networks", institution: "Cisco Networking Academy", date: "2023" },
       { title: "Introduction to Cybersecurity", institution: "Cisco Networking Academy", date: "2023" },
+    ],
+  },
+  {
+    title: "YES Youth",
+    description: "Work readiness and entrepreneurial certificates completed through YES One App.",
+    items: [
+      { title: "Entrepreneur Certificate", institution: "YES One App", date: "2026", category: "YES Youth" },
+      { title: "Digital Certificate", institution: "YES One App", date: "2026", category: "YES Youth" },
+      { title: "Work Readiness Certificate", institution: "YES One App", date: "2026", category: "YES Youth" },
     ],
   },
 ];
@@ -258,7 +268,12 @@ function CertificationsPage() {
           <section key={category.title} className="space-y-4">
             <div className="flex items-end justify-between gap-4">
               <div>
-                <h3 className="text-xl font-semibold">{category.title}</h3>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <h3 className="text-xl font-semibold">{category.title}</h3>
+                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                    {category.items.length} {category.items.length === 1 ? "Certificate" : "Certificates"}
+                  </span>
+                </div>
                 {category.description ? <p className="mt-1 text-sm text-muted-foreground">{category.description}</p> : null}
               </div>
             </div>
@@ -278,6 +293,7 @@ function CertificationsPage() {
                   <div className="mt-5 flex flex-1 flex-col">
                     <h4 className="text-base font-semibold leading-snug">{item.title}</h4>
                     <p className="mt-2 text-sm text-muted-foreground">{item.institution}</p>
+                    {item.category ? <p className="mt-1 text-xs text-muted-foreground">Category: {item.category}</p> : null}
                     {item.date ? (
                       <p className="mt-3 text-xs uppercase tracking-[0.24em] text-primary">Completed {item.date}</p>
                     ) : (
@@ -315,7 +331,11 @@ function CertificationsPage() {
             <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6">
               <div>
                 <h3 className="text-lg font-semibold">{viewing?.title}</h3>
-                <p className="text-sm text-muted-foreground">{viewing?.institution}</p>
+                <p className="text-sm text-muted-foreground">
+                  {[viewing?.institution, viewing?.date ? `Completed ${viewing.date}` : null, viewing?.category]
+                    .filter(Boolean)
+                    .join(" • ")}
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <Button type="button" size="icon" variant="outline" onClick={() => setZoom((value) => Math.min(2, Number((value + 0.25).toFixed(2))))}>
