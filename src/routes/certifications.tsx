@@ -14,7 +14,6 @@ type CertificateItem = {
   institution: string;
   date: string | null;
   assetHint?: string;
-  category?: string;
 };
 
 type CertificateCategory = {
@@ -96,9 +95,9 @@ const categories: CertificateCategory[] = [
     title: "YES Youth",
     description: "Work readiness and entrepreneurial certificates completed through YES One App.",
     items: [
-      { title: "Entrepreneur Certificate", institution: "YES One App", date: "2026", category: "YES Youth" },
-      { title: "Digital Certificate", institution: "YES One App", date: "2026", category: "YES Youth" },
-      { title: "Work Readiness Certificate", institution: "YES One App", date: "2026", category: "YES Youth" },
+      { title: "Entrepreneur Certificate", institution: "YES One App", date: "2026" },
+      { title: "Digital Certificate", institution: "YES One App", date: "2026" },
+      { title: "Work Readiness Certificate", institution: "YES One App", date: "2026" },
     ],
   },
 ];
@@ -293,7 +292,6 @@ function CertificationsPage() {
                   <div className="mt-5 flex flex-1 flex-col">
                     <h4 className="text-base font-semibold leading-snug">{item.title}</h4>
                     <p className="mt-2 text-sm text-muted-foreground">{item.institution}</p>
-                    {item.category ? <p className="mt-1 text-xs text-muted-foreground">Category: {item.category}</p> : null}
                     {item.date ? (
                       <p className="mt-3 text-xs uppercase tracking-[0.24em] text-primary">Completed {item.date}</p>
                     ) : (
@@ -332,7 +330,7 @@ function CertificationsPage() {
               <div>
                 <h3 className="text-lg font-semibold">{viewing?.title}</h3>
                 <p className="text-sm text-muted-foreground">
-                  {[viewing?.institution, viewing?.date ? `Completed ${viewing.date}` : null, viewing?.category]
+                  {[viewing?.institution, viewing?.date ? `Completed ${viewing.date}` : null]
                     .filter(Boolean)
                     .join(" • ")}
                 </p>
